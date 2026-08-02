@@ -304,6 +304,7 @@ Day 12:
   2. Exact match
   3. Alias match
   4. Partial match
+  5. Account for spelling mistakes and typos. Need LLM for this?
   5. Ranked candidates
   6. If still no match: fall back to the external food database API, persist
      the result to PostgreSQL, and return it (see "Food Lookup Flow")

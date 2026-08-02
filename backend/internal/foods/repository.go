@@ -25,7 +25,7 @@ func (r *Repository) List(ctx context.Context) ([]nutrition.Food, error) {
 	}
 	defer rows.Close()
 
-	var result []nutrition.Food
+	var result = []nutrition.Food{}
 	for rows.Next() {
 		var f nutrition.Food
 		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity); err != nil {
@@ -43,14 +43,15 @@ func (r *Repository) Search(ctx context.Context, query string) ([]nutrition.Food
 	rows, err := r.pool.Query(ctx, `
 		SELECT name, calories, protein, carbs, fat, fiber, sodium, unit, unit_quantity
 		FROM foods
-		WHERE name ILIKE '%' || $1 || '%'
+		WHERE similarity(name, $1) > 0.2
+		ORDER BY similarity(name, $1) DESC
 	`, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []nutrition.Food
+	var result = []nutrition.Food{}
 	for rows.Next() {
 		var f nutrition.Food
 		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity); err != nil {

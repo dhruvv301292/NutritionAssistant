@@ -23,7 +23,8 @@ func main() {
 	defer pool.Close()
 
 	foodRepo := foods.NewRepository(pool)
-	handler := api.NewHandler(foodRepo)
+	foodService := foods.NewService(foodRepo) 
+	handler := api.NewHandler(foodService)
 
 	r := chi.NewRouter()
 	r.Get("/health", api.Health)

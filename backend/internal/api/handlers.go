@@ -9,11 +9,11 @@ import (
 )
 
 type Handler struct {
-	foodRepo *foods.Repository
+	foodService *foods.Service
 }
 
-func NewHandler(foodRepo *foods.Repository) *Handler {
-	return &Handler{foodRepo: foodRepo}
+func NewHandler(food *foods.Service) *Handler {
+	return &Handler{foodService: food}
 }
 
 func Health(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func Health(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListFoods(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	response, err := h.foodRepo.List(r.Context())
+	response, err := h.foodService.List(r.Context())
 	if err != nil {
 		http.Error(w, "failed to list foods", http.StatusInternalServerError)
 		return
@@ -37,7 +37,7 @@ func (h *Handler) ListFoods(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SearchFoods(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	queryFood := r.URL.Query().Get("q")
-	response, err := h.foodRepo.Search(r.Context(), queryFood)
+	response, err := h.foodService.Search(r.Context(), queryFood)
 	if err != nil {
 		http.Error(w, "failed to search foods", http.StatusInternalServerError)
 		return
@@ -51,7 +51,7 @@ func (h *Handler) CalculateNutrition(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	foundFoods, err := h.foodRepo.Search(r.Context(), calcNutritionReq.FoodName)
+	foundFoods, err := h.foodService.Search(r.Context(), calcNutritionReq.FoodName)
 	if err != nil {
 		http.Error(w, "failed to search foods", http.StatusInternalServerError)
 		return
