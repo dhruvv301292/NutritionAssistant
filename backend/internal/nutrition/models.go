@@ -8,8 +8,9 @@ type Food struct {
 	Fat          float64 `json:"fat"`
 	Fiber        float64 `json:"fiber"`
 	Sodium       float64 `json:"sodium"`
-	Unit         string  `json:"unit"`
-	UnitQuantity float64 `json:"unitquantity"`
+	Unit         string   `json:"unit"`
+	UnitQuantity float64  `json:"unitquantity"`
+	GramsPerUnit *float64 `json:"grams_per_unit,omitempty"`
 }
 
 type Nutrition struct {

@@ -17,7 +17,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) List(ctx context.Context) ([]nutrition.Food, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT name, calories, protein, carbs, fat, fiber, sodium, unit, unit_quantity
+		SELECT name, calories, protein, carbs, fat, fiber, sodium, unit, unit_quantity, grams_per_unit
 		FROM foods
 	`)
 	if err != nil {
@@ -28,7 +28,7 @@ func (r *Repository) List(ctx context.Context) ([]nutrition.Food, error) {
 	var result = []nutrition.Food{}
 	for rows.Next() {
 		var f nutrition.Food
-		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity); err != nil {
+		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity, &f.GramsPerUnit); err != nil {
 			return nil, err
 		}
 		result = append(result, f)
@@ -41,7 +41,7 @@ func (r *Repository) List(ctx context.Context) ([]nutrition.Food, error) {
 
 func (r *Repository) Search(ctx context.Context, query string) ([]nutrition.Food, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT name, calories, protein, carbs, fat, fiber, sodium, unit, unit_quantity
+		SELECT name, calories, protein, carbs, fat, fiber, sodium, unit, unit_quantity, grams_per_unit
 		FROM foods
 		WHERE similarity(name, $1) > 0.2
 		ORDER BY similarity(name, $1) DESC
@@ -54,7 +54,7 @@ func (r *Repository) Search(ctx context.Context, query string) ([]nutrition.Food
 	var result = []nutrition.Food{}
 	for rows.Next() {
 		var f nutrition.Food
-		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity); err != nil {
+		if err := rows.Scan(&f.Name, &f.Calories, &f.Protein, &f.Carbs, &f.Fat, &f.Fiber, &f.Sodium, &f.Unit, &f.UnitQuantity, &f.GramsPerUnit); err != nil {
 			return nil, err
 		}
 		result = append(result, f)

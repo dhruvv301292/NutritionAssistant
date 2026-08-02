@@ -304,8 +304,8 @@ Day 12:
   2. Exact match
   3. Alias match
   4. Partial match
-  5. Account for spelling mistakes and typos. Need LLM for this?
-  5. Ranked candidates
+  5. Account for spelling mistakes and typos (e.g. pg_trgm similarity)
+  6. Ranked candidates
   6. If still no match: fall back to the external food database API, persist
      the result to PostgreSQL, and return it (see "Food Lookup Flow")
 
@@ -318,6 +318,14 @@ Day 13:
   - `ConvertToGrams(quantity float64, unit string, food Food)`
 
 Day 14:
+- Extend unit conversion to handle units that don't match the food's native
+  unit family (e.g. converting a count-based food like `egg` to/from grams)
+- Add a `grams_per_unit` reference field (e.g. `foods` table column) for
+  count-based foods so weight-based quantities become meaningful for them
+- Update `ConvertToGrams` to use it when present, and fall back to
+  exact-unit-match behavior when it isn't
+
+Day 15:
 - Improve React food search UI
 - Show serving size and nutrition per 100g
 
@@ -330,17 +338,17 @@ Goal:
 - Backend calculates totals
 - Go resolves multiple ingredients concurrently
 
-Day 15:
+Day 16:
 - Create:
   - `meal_logs`
   - `meal_log_items`
 
-Day 16:
+Day 17:
 - Add:
   - `POST /meals/calculate`
 - Input should support multiple ingredients
 
-Day 17:
+Day 18:
 - Implement concurrent ingredient lookup
 - Use goroutines and channels or `errgroup`
 - Each ingredient should be matched independently
@@ -348,21 +356,21 @@ Day 17:
 
 This is a central Go feature of the project.
 
-Day 18:
+Day 19:
 - Build ambiguity detection
 - Example:
   - `chicken` should return options, not a blind guess
 
-Day 19:
+Day 20:
 - Add:
   - `POST /meals`
   - `GET /meals/today`
 
-Day 20:
+Day 21:
 - Add:
   - `GET /summary/daily?date=YYYY-MM-DD`
 
-Day 21:
+Day 22:
 - Build React meal logger and dashboard
 - Show calories, protein, carbs, fat, and fiber
 
@@ -376,7 +384,7 @@ Goal:
 - Go calculates nutrition
 - React shows result
 
-Day 22:
+Day 23:
 - Design structured AI output schema:
 
 ```json
@@ -393,12 +401,12 @@ Day 22:
 }
 ```
 
-Day 23:
+Day 24:
 - Add:
   - `POST /ai/parse-meal`
 - LLM returns structured JSON only
 
-Day 24:
+Day 25:
 - Add:
   - `POST /chat/meal`
 - Flow:
@@ -408,19 +416,19 @@ Day 24:
   4. Go calculates nutrition
   5. Response returned
 
-Day 25:
+Day 26:
 - Add clarification flow
 - If Go returns ambiguity, ask user a follow-up
 
-Day 26:
+Day 27:
 - Add coaching response
 - Compare totals against user targets
 
-Day 27:
+Day 28:
 - Build React chat UI
 - Show chat messages plus nutrition cards
 
-Day 28:
+Day 29:
 - Add Go unit tests for:
   - unit conversion
   - nutrition calculation
@@ -435,22 +443,22 @@ Day 28:
 Goal:
 - Project is demoable and resume-ready
 
-Day 29:
+Day 30:
 - Add loading states, error states, and empty states
 
-Day 30:
+Day 31:
 - Write README
 - Include architecture diagram
 - Explain why Go owns the nutrition engine
 
-Day 31:
+Day 32:
 - Add demo dataset and screenshots
 - Add example prompts:
   - `I had 2 homemade smash burgers and a Quest shake`
   - `230g chicken thighs and 150g cooked rice`
   - `Greek yogurt with whey and grapes`
 
-Day 32:
+Day 33:
 - Write resume bullets
 
 Suggested resume bullets:
