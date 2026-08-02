@@ -6,6 +6,7 @@ import (
 	"os"
 	"github.com/dhruvv301292/nutrichat/internal/api"
 	"github.com/dhruvv301292/nutrichat/internal/db"
+	"github.com/dhruvv301292/nutrichat/internal/foods"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"github.com/joho/godotenv"
@@ -20,10 +21,14 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer pool.Close()
+
+	foodRepo := foods.NewRepository(pool)
+	handler := api.NewHandler(foodRepo)
+
 	r := chi.NewRouter()
 	r.Get("/health", api.Health)
-	r.Get("/foods", api.ListFoods)
-	r.Get("/foods/search", api.SearchFoods)
-	r.Post("/nutrition/calculate", api.CalculateNutrition)
+	r.Get("/foods", handler.ListFoods)
+	r.Get("/foods/search", handler.SearchFoods)
+	r.Post("/nutrition/calculate", handler.CalculateNutrition)
 	http.ListenAndServe(":8080", r)
 }
