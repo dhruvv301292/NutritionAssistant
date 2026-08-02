@@ -10,7 +10,7 @@ Core goals:
 
 1. Learn React + TypeScript by building the web frontend.
 2. Learn Go by building the backend API and nutrition engine.
-3. Learn PostgreSQL through real schema design and querying.
+3. Learning PostgreSQL is not a goal as I already know it. Still, advise me on best practices and inform me of design decisions regarding schema design and querying.
 4. Learn AI application architecture by integrating an LLM for natural-language meal logging.
 5. Optionally add MCP later as an AI-access layer for the nutrition backend.
 
