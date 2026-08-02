@@ -39,7 +39,7 @@ Act as my instructor, tutor, and code reviewer.
 For each task:
 
 1. Explain the concept before giving code.
-2. Ask me to attempt the implementation first when reasonable.
+2. Ask me to attempt the implementation first if you think we have already covered the concepts required, else give me the boiler plate and let me ask questions as I implement.
 3. Review my code critically.
 4. Explain mistakes in plain language.
 5. Encourage clean architecture, not shortcuts.
@@ -51,7 +51,7 @@ When giving code:
 - Prefer small, focused snippets over huge copy-paste files.
 - Explain where each file goes.
 - Explain what each function or component is responsible for.
-- Ask me to run tests or manually verify behavior.
+- Show me test examples.
 - Point out edge cases.
 
 Do not let me rely on the LLM for nutrition math. The backend should calculate nutrition deterministically.
@@ -83,6 +83,15 @@ Later:
 
 ---
 
+## UI Philosophy
+
+React UI structure, components, and layout are intentionally left open-ended.
+Each frontend day below states the *functional* goal (what data/interactions
+are needed), not a fixed component architecture. Specific components, layouts,
+and styling decisions are made together during the session when we get there.
+
+---
+
 ## Key Architecture Rule
 
 Do not let the LLM do nutrition math.
@@ -96,6 +105,8 @@ LLM responsibilities:
 Go backend responsibilities:
 - Normalize food names
 - Match ingredients against food records
+- Fall back to an external food database API when no local match exists, and
+  cache the result in PostgreSQL for future lookups
 - Handle raw vs cooked variants
 - Convert units
 - Run concurrent food lookups
@@ -142,6 +153,33 @@ User-friendly response
 
 ---
 
+## Food Lookup Flow (Cache-Aside Pattern)
+
+When the nutrition engine needs data for a food, it follows a cache-aside pattern:
+
+```text
+1. Normalize the food name
+2. Search PostgreSQL (foods, food_aliases)
+   - Found     -> return matched food
+   - Not found -> query external food database API
+                  -> map response to internal Food model
+                  -> insert into PostgreSQL (foods / nutrition_profiles)
+                  -> return as matched food
+```
+
+This keeps PostgreSQL as the source of truth for anything the app has already
+seen, while still being able to resolve foods that were never seeded.
+
+Notes for later:
+- Which external API to use (e.g., USDA FoodData Central) is decided when we
+  build this — Week 2/3, not now.
+- Concurrent requests for the same unseen food could race to insert it twice —
+  handle with an upsert (`ON CONFLICT DO NOTHING`) when we get there.
+- API credentials are managed via environment variables / Docker secrets
+  (Phase 2).
+
+---
+
 ## Backend Design Focus
 
 The Go backend should highlight Go's strengths:
@@ -167,6 +205,7 @@ backend/
     units.go
     concurrent_lookup.go
   internal/foods/
+  internal/fooddata/   # external food DB API client (cache-aside fallback)
   internal/meals/
   internal/ai/
   internal/db/
@@ -203,8 +242,9 @@ Day 3:
 
 Day 4:
 - Create React + TypeScript + Vite app
-- Build homepage
-- Build static `FoodSearch` and `NutritionCard` components
+- Build a homepage
+- Sketch initial UI for searching foods and viewing nutrition info
+  (component structure/names decided together during the session)
 
 Day 5:
 - Learn `useState`, `useEffect`, and `fetch`
@@ -230,7 +270,7 @@ Goal:
 
 Day 8:
 - Learn SQL basics
-- Create local Postgres database
+- Create Supabase project and database
 - Create `foods` table
 
 Day 9:
@@ -265,6 +305,8 @@ Day 12:
   3. Alias match
   4. Partial match
   5. Ranked candidates
+  6. If still no match: fall back to the external food database API, persist
+     the result to PostgreSQL, and return it (see "Food Lookup Flow")
 
 Day 13:
 - Build unit conversion v1:
@@ -423,7 +465,7 @@ Suggested resume bullets:
 Phase 2: Docker
 - Dockerize backend
 - Dockerize frontend
-- Add docker-compose for Postgres
+- Manage external food API credentials via environment variables / secrets
 
 Phase 3: MCP
 - Expose existing Go backend through MCP tools:
