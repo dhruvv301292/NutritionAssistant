@@ -52,10 +52,13 @@ export type LogItem = {
   unit: string,
 }
 
+export type Slot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
 export type MealLog = {
   id: number,
   user_id: number,
   logged_at: string,
+  slot: Slot,
   items: LogItem[],
 }
 

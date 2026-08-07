@@ -1,7 +1,6 @@
-// The backend has no concept of meal "slots" (breakfast/lunch/dinner) —
-// meal_logs only stores a timestamp. Same approach as the design mockup:
-// derive a slot label client-side from the hour logged.
-export type Slot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+import type { Slot } from './types/api';
+
+export type { Slot };
 
 export const SLOT_ORDER: Slot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 export const SLOT_LABEL: Record<Slot, string> = {
@@ -11,7 +10,9 @@ export const SLOT_LABEL: Record<Slot, string> = {
   snack: 'Snacks',
 };
 
-export function slotForTime(d: Date): Slot {
+// Sensible default for the slot picker, based on time of day — the user can
+// always override it before saving.
+export function suggestedSlot(d: Date): Slot {
   const h = d.getHours();
   if (h >= 5 && h < 11) return 'breakfast';
   if (h >= 11 && h < 16) return 'lunch';

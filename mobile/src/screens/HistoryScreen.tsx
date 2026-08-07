@@ -1,25 +1,39 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { dailySummary, getGoals } from '../api/client';
 import CaloriesCard from '../components/CaloriesCard';
+import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
 import NutritionTags from '../components/NutritionTags';
 import { colors, fonts, radius, shadow } from '../theme';
-import { dateKey, formatTime, last14Days } from '../dateUtils';
-import { SLOT_LABEL, SLOT_ORDER, slotForTime } from '../slots';
+import { dateKey, formatTime, startOfWeek, weekDates } from '../dateUtils';
+import { SLOT_LABEL, SLOT_ORDER } from '../slots';
 import type { DailySummary, Goals, MealLog, Nutrition } from '../types/api';
 
-export default function HistoryScreen() {
+const WEEKDAY_LABELS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+const WEEK_PAGER_CENTER = 1;
+
+const MACRO_TILES: { key: keyof Nutrition; label: string; color: string; goalKey: keyof Goals }[] = [
+  { key: 'protein', label: 'PROTEIN', color: colors.accent700, goalKey: 'protein_goal' },
+  { key: 'carbs', label: 'CARBS', color: colors.accent2_500, goalKey: 'carb_goal' },
+  { key: 'fat', label: 'FAT', color: colors.neutral700, goalKey: 'fat_goal' },
+  { key: 'fiber', label: 'FIBER', color: colors.accent2_700, goalKey: 'fiber_goal' },
+];
+
+export default function HistoryScreen({ focused }: { focused: boolean }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return dateKey(yesterday);
   });
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeMacro, setActiveMacro] = useState<(typeof MACRO_TILES)[number] | null>(null);
+  const weekPagerRef = useRef<PagerView>(null);
 
   const load = useCallback((date: string) => {
     setError(null);
@@ -32,9 +46,38 @@ export default function HistoryScreen() {
       .catch(() => setError('Could not load that day.'));
   }, []);
 
-  useFocusEffect(useCallback(() => { load(selectedDate); }, [load, selectedDate]));
+  useEffect(() => { if (focused) load(selectedDate); }, [focused, load, selectedDate]);
 
-  const dates = last14Days(new Date());
+  const todayKey = dateKey(new Date());
+  const currentWeekStart = startOfWeek(new Date());
+  const isCurrentWeek = dateKey(weekStart) === dateKey(currentWeekStart);
+
+  // The pager always shows [prev week, current week, next week] with the
+  // current week centered. After a swipe settles on an edge page, shift
+  // weekStart by 7 days and snap back to center without animating, so the
+  // pager always has a page to swipe to in either direction. Swiping past
+  // the current week is undone immediately — the "next" page is never a
+  // real future week.
+  function handlePageSelected(position: number) {
+    if (position === WEEK_PAGER_CENTER) return;
+    if (position > WEEK_PAGER_CENTER && isCurrentWeek) {
+      requestAnimationFrame(() => weekPagerRef.current?.setPageWithoutAnimation(WEEK_PAGER_CENTER));
+      return;
+    }
+    const delta = position === 0 ? -7 : 7;
+    setWeekStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + delta);
+      return next;
+    });
+    requestAnimationFrame(() => weekPagerRef.current?.setPageWithoutAnimation(WEEK_PAGER_CENTER));
+  }
+
+  const weeks = [-7, 0, 7].map((offset) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + offset);
+    return weekDates(d);
+  });
 
   const mealsBySlot = groupBySlot(summary?.meals ?? []);
 
@@ -42,31 +85,50 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.title}>History</Text>
 
-      <FlatList
-        horizontal
-        data={dates}
-        keyExtractor={(d) => dateKey(d)}
-        showsHorizontalScrollIndicator={false}
-        style={styles.dateStrip}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
-        initialScrollIndex={dates.length - 1}
-        getItemLayout={(_, index) => ({ length: 60, offset: 60 * index, index })}
-        renderItem={({ item }) => {
-          const key = dateKey(item);
-          const isSelected = key === selectedDate;
-          return (
-            <Pressable
-              onPress={() => setSelectedDate(key)}
-              style={[styles.dateChip, { backgroundColor: isSelected ? colors.accent : colors.surface }]}
-            >
-              <Text style={[styles.dateWeekday, { color: isSelected ? colors.bg : colors.text }]}>
-                {item.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2)}
-              </Text>
-              <Text style={[styles.dateNum, { color: isSelected ? colors.bg : colors.text }]}>{item.getDate()}</Text>
-            </Pressable>
-          );
-        }}
-      />
+      <View style={styles.weekdayRow}>
+        {WEEKDAY_LABELS.map((label) => (
+          <Text key={label} style={styles.weekdayLabel}>{label}</Text>
+        ))}
+      </View>
+
+      <PagerView
+        ref={weekPagerRef}
+        style={styles.weekPager}
+        initialPage={WEEK_PAGER_CENTER}
+        onPageSelected={(e) => handlePageSelected(e.nativeEvent.position)}
+      >
+        {weeks.map((week, i) => (
+          <View key={i} style={styles.dateRow}>
+            {week.map((day) => {
+              const key = dateKey(day);
+              const isSelected = key === selectedDate;
+              const isFuture = key > todayKey;
+              return (
+                <Pressable
+                  key={key}
+                  disabled={isFuture}
+                  onPress={() => setSelectedDate(key)}
+                  style={[
+                    styles.dateChip,
+                    { backgroundColor: isSelected ? colors.accent : colors.surface },
+                    isFuture && styles.dateChipDisabled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dateNum,
+                      { color: isSelected ? colors.bg : colors.text },
+                      isFuture && styles.dateNumDisabled,
+                    ]}
+                  >
+                    {day.getDate()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </PagerView>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {error && <Text style={styles.errorText}>{error}</Text>}
@@ -75,12 +137,28 @@ export default function HistoryScreen() {
           <>
             <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
             <View style={styles.tileGrid}>
-              <MacroTile label="PROTEIN" value={Math.round(summary.total.protein)} goal={goals.protein_goal} color={colors.accent700} />
-              <MacroTile label="CARBS" value={Math.round(summary.total.carbs)} goal={goals.carb_goal} color={colors.accent2_500} />
+              {MACRO_TILES.slice(0, 2).map((m) => (
+                <MacroTile
+                  key={m.key}
+                  label={m.label}
+                  value={Math.round(summary.total[m.key])}
+                  goal={goals[m.goalKey]}
+                  color={m.color}
+                  onPress={() => setActiveMacro(m)}
+                />
+              ))}
             </View>
             <View style={[styles.tileGrid, { marginBottom: 18 }]}>
-              <MacroTile label="FAT" value={Math.round(summary.total.fat)} goal={goals.fat_goal} color={colors.neutral700} />
-              <MacroTile label="FIBER" value={Math.round(summary.total.fiber)} goal={goals.fiber_goal} color={colors.accent2_700} />
+              {MACRO_TILES.slice(2, 4).map((m) => (
+                <MacroTile
+                  key={m.key}
+                  label={m.label}
+                  value={Math.round(summary.total[m.key])}
+                  goal={goals[m.goalKey]}
+                  color={m.color}
+                  onPress={() => setActiveMacro(m)}
+                />
+              ))}
             </View>
 
             {SLOT_ORDER.map((slot) => (
@@ -105,6 +183,19 @@ export default function HistoryScreen() {
           </>
         )}
       </ScrollView>
+
+      {summary && activeMacro && (
+        <MacroBreakdownSheet
+          visible={!!activeMacro}
+          onClose={() => setActiveMacro(null)}
+          label={activeMacro.label}
+          macroKey={activeMacro.key}
+          unit="g"
+          total={summary.total[activeMacro.key]}
+          color={activeMacro.color}
+          meals={summary.meals}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -126,7 +217,7 @@ function sumMealNutrition(meal: MealLog): Nutrition {
 function groupBySlot(meals: MealLog[]): Partial<Record<string, MealLog[]>> {
   const result: Partial<Record<string, MealLog[]>> = {};
   for (const meal of meals) {
-    const slot = slotForTime(new Date(meal.logged_at));
+    const slot = meal.slot;
     result[slot] = result[slot] ?? [];
     result[slot]!.push(meal);
   }
@@ -136,10 +227,14 @@ function groupBySlot(meals: MealLog[]): Partial<Record<string, MealLog[]>> {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text, paddingHorizontal: 20, marginBottom: 10 },
-  dateStrip: { flexGrow: 0, marginBottom: 16 },
-  dateChip: { width: 52, alignItems: 'center', gap: 5, paddingVertical: 10, borderRadius: radius.lg },
-  dateWeekday: { fontFamily: fonts.bodySemiBold, fontSize: 13, textTransform: 'uppercase', opacity: 0.75 },
+  weekdayRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 8 },
+  weekdayLabel: { flex: 1, textAlign: 'center', fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.text, opacity: 0.5, textTransform: 'uppercase' },
+  weekPager: { height: 66, marginBottom: 16 },
+  dateRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 6 },
+  dateChip: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: radius.lg },
+  dateChipDisabled: { opacity: 0.35 },
   dateNum: { fontFamily: fonts.heading, fontSize: 23 },
+  dateNumDisabled: { color: colors.neutral500 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
   kicker: { fontFamily: fonts.bodySemiBold, fontSize: 10, letterSpacing: 1, color: colors.accent, marginBottom: 8, textTransform: 'uppercase' },
   tileGrid: { flexDirection: 'row', gap: 12, marginBottom: 12 },

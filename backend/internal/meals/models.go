@@ -37,6 +37,7 @@ type Log struct {
 	ID       int       `json:"id"`
 	UserID   int       `json:"user_id"`
 	LoggedAt time.Time `json:"logged_at"`
+	Slot     string    `json:"slot"`
 	Items    []LogItem `json:"items"`
 }
 
@@ -51,7 +52,15 @@ type LogItem struct {
 
 type SaveRequest struct {
 	UserID int           `json:"user_id"`
+	Slot   string        `json:"slot"`
 	Items  []ItemRequest `json:"items"`
+}
+
+var ValidSlots = map[string]bool{
+	"breakfast": true,
+	"lunch":     true,
+	"dinner":    true,
+	"snack":     true,
 }
 
 type DailySummary struct {

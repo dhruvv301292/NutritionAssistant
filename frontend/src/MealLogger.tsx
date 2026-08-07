@@ -1,8 +1,18 @@
 import { useState } from 'react'
-import type { ItemRequest, CalculateResponse } from './types'
+import type { ItemRequest, CalculateResponse, Slot } from './types'
 
 const UNITS = ['grams', 'ounces', 'count']
 const CURRENT_USER_ID = 1
+const SLOTS: Slot[] = ['breakfast', 'lunch', 'dinner', 'snack']
+const SLOT_LABEL: Record<Slot, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' }
+
+function suggestedSlot(): Slot {
+  const h = new Date().getHours()
+  if (h >= 5 && h < 11) return 'breakfast'
+  if (h >= 11 && h < 16) return 'lunch'
+  if (h >= 16 && h < 22) return 'dinner'
+  return 'snack'
+}
 
 type Props = {
   onSaved: () => void,
@@ -14,6 +24,7 @@ function emptyItem(): ItemRequest {
 
 export default function MealLogger({ onSaved }: Props) {
   const [items, setItems] = useState<ItemRequest[]>([emptyItem()])
+  const [slot, setSlot] = useState<Slot>(suggestedSlot)
   const [preview, setPreview] = useState<CalculateResponse | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -69,7 +80,7 @@ export default function MealLogger({ onSaved }: Props) {
       const res = await fetch('/api/meals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: CURRENT_USER_ID, items: validItems }),
+        body: JSON.stringify({ user_id: CURRENT_USER_ID, slot, items: validItems }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -89,6 +100,18 @@ export default function MealLogger({ onSaved }: Props) {
   return (
     <div className="meal-logger">
       <h2>Log a Meal</h2>
+      <div className="meal-slot-row">
+        {SLOTS.map(s => (
+          <button
+            type="button"
+            key={s}
+            className={s === slot ? 'meal-slot-chip meal-slot-chip-active' : 'meal-slot-chip'}
+            onClick={() => setSlot(s)}
+          >
+            {SLOT_LABEL[s]}
+          </button>
+        ))}
+      </div>
       {items.map((item, index) => (
         <div className="meal-item-row" key={index}>
           <input

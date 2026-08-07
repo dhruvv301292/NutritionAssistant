@@ -1,21 +1,29 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { dailySummary, getGoals } from '../api/client';
 import CaloriesCard from '../components/CaloriesCard';
 import LogMealSheet from '../components/LogMealSheet';
+import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
 import { colors, fonts, radius, shadow } from '../theme';
 import { dateKey, formatDateLabel } from '../dateUtils';
-import type { DailySummary, Goals } from '../types/api';
+import type { DailySummary, Goals, Nutrition } from '../types/api';
 
-export default function TodayScreen() {
+const MACRO_TILES: { key: keyof Nutrition; label: string; color: string; goalKey: keyof Goals }[] = [
+  { key: 'protein', label: 'PROTEIN', color: colors.accent700, goalKey: 'protein_goal' },
+  { key: 'carbs', label: 'CARBS', color: colors.accent2_500, goalKey: 'carb_goal' },
+  { key: 'fat', label: 'FAT', color: colors.neutral700, goalKey: 'fat_goal' },
+  { key: 'fiber', label: 'FIBER', color: colors.accent2_700, goalKey: 'fiber_goal' },
+];
+
+export default function TodayScreen({ focused }: { focused: boolean }) {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [activeMacro, setActiveMacro] = useState<(typeof MACRO_TILES)[number] | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -28,7 +36,7 @@ export default function TodayScreen() {
       .catch(() => setError("Could not load today's data."));
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => { if (focused) load(); }, [focused, load]);
 
   const now = new Date();
 
@@ -48,12 +56,28 @@ export default function TodayScreen() {
           <>
             <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
             <View style={styles.tileGrid}>
-              <MacroTile label="PROTEIN" value={Math.round(summary.total.protein)} goal={goals.protein_goal} color={colors.accent700} />
-              <MacroTile label="CARBS" value={Math.round(summary.total.carbs)} goal={goals.carb_goal} color={colors.accent2_500} />
+              {MACRO_TILES.slice(0, 2).map((m) => (
+                <MacroTile
+                  key={m.key}
+                  label={m.label}
+                  value={Math.round(summary.total[m.key])}
+                  goal={goals[m.goalKey]}
+                  color={m.color}
+                  onPress={() => setActiveMacro(m)}
+                />
+              ))}
             </View>
             <View style={styles.tileGrid}>
-              <MacroTile label="FAT" value={Math.round(summary.total.fat)} goal={goals.fat_goal} color={colors.neutral700} />
-              <MacroTile label="FIBER" value={Math.round(summary.total.fiber)} goal={goals.fiber_goal} color={colors.accent2_700} />
+              {MACRO_TILES.slice(2, 4).map((m) => (
+                <MacroTile
+                  key={m.key}
+                  label={m.label}
+                  value={Math.round(summary.total[m.key])}
+                  goal={goals[m.goalKey]}
+                  color={m.color}
+                  onPress={() => setActiveMacro(m)}
+                />
+              ))}
             </View>
           </>
         )}
@@ -67,6 +91,19 @@ export default function TodayScreen() {
       </Pressable>
 
       <LogMealSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onMealSaved={load} />
+
+      {summary && activeMacro && (
+        <MacroBreakdownSheet
+          visible={!!activeMacro}
+          onClose={() => setActiveMacro(null)}
+          label={activeMacro.label}
+          macroKey={activeMacro.key}
+          unit="g"
+          total={summary.total[activeMacro.key]}
+          color={activeMacro.color}
+          meals={summary.meals}
+        />
+      )}
     </SafeAreaView>
   );
 }

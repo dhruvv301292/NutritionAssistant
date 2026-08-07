@@ -105,7 +105,7 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "items must not be empty", http.StatusBadRequest)
 		return
 	}
-	log, itemResults, err := h.mealService.Save(r.Context(), req.UserID, req.Items)
+	log, itemResults, err := h.mealService.Save(r.Context(), req.UserID, req.Slot, req.Items)
 	if err != nil {
 		if errors.Is(err, meals.ErrUnresolvedItems) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -113,6 +113,10 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 				"error": "one or more items could not be resolved",
 				"items": itemResults,
 			})
+			return
+		}
+		if errors.Is(err, meals.ErrInvalidSlot) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		http.Error(w, "failed to save meal", http.StatusInternalServerError)

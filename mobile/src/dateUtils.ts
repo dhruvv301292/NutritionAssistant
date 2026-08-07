@@ -17,3 +17,20 @@ export function last14Days(from: Date): Date[] {
     return d;
   });
 }
+
+// Monday of the week containing `d`.
+export function startOfWeek(d: Date): Date {
+  const result = new Date(d);
+  const day = result.getDay(); // 0 = Sunday .. 6 = Saturday
+  const diff = day === 0 ? -6 : 1 - day;
+  result.setDate(result.getDate() + diff);
+  return result;
+}
+
+export function weekDates(weekStart: Date): Date[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}

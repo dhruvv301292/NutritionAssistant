@@ -16,7 +16,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 // Save inserts a meal log and its items in a single transaction so a
 // failure partway through doesn't leave a meal_logs row with no items.
-func (r *Repository) Save(ctx context.Context, userID int, items []LogItem) (Log, error) {
+func (r *Repository) Save(ctx context.Context, userID int, slot string, items []LogItem) (Log, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return Log{}, err
@@ -25,9 +25,9 @@ func (r *Repository) Save(ctx context.Context, userID int, items []LogItem) (Log
 
 	log := Log{UserID: userID}
 	err = tx.QueryRow(ctx, `
-		INSERT INTO meal_logs (user_id) VALUES ($1)
-		RETURNING id, user_id, logged_at
-	`, userID).Scan(&log.ID, &log.UserID, &log.LoggedAt)
+		INSERT INTO meal_logs (user_id, slot) VALUES ($1, $2)
+		RETURNING id, user_id, logged_at, slot
+	`, userID, slot).Scan(&log.ID, &log.UserID, &log.LoggedAt, &log.Slot)
 	if err != nil {
 		return Log{}, err
 	}
@@ -55,7 +55,7 @@ func (r *Repository) Save(ctx context.Context, userID int, items []LogItem) (Log
 // logged_at falls within [start, end).
 func (r *Repository) ListByUserAndDateRange(ctx context.Context, userID int, start, end string) ([]Log, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, logged_at
+		SELECT id, user_id, logged_at, slot
 		FROM meal_logs
 		WHERE user_id = $1 AND logged_at >= $2 AND logged_at < $3
 		ORDER BY logged_at
@@ -68,7 +68,7 @@ func (r *Repository) ListByUserAndDateRange(ctx context.Context, userID int, sta
 	logs := []Log{}
 	for rows.Next() {
 		var l Log
-		if err := rows.Scan(&l.ID, &l.UserID, &l.LoggedAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.UserID, &l.LoggedAt, &l.Slot); err != nil {
 			return nil, err
 		}
 		logs = append(logs, l)

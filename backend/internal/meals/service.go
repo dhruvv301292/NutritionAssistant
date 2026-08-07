@@ -11,6 +11,7 @@ import (
 )
 
 var ErrUnresolvedItems = errors.New("one or more items could not be resolved")
+var ErrInvalidSlot = errors.New("slot must be one of breakfast, lunch, dinner, snack")
 
 type Service struct {
 	repo        *Repository
@@ -44,7 +45,11 @@ func (s *Service) Calculate(ctx context.Context, items []ItemRequest) CalculateR
 // unambiguously and without error, persists the meal. Otherwise nothing is
 // written and the caller gets back the same per-item diagnostics Calculate
 // would have produced, so the client can show the user what needs fixing.
-func (s *Service) Save(ctx context.Context, userID int, items []ItemRequest) (Log, []ItemResult, error) {
+func (s *Service) Save(ctx context.Context, userID int, slot string, items []ItemRequest) (Log, []ItemResult, error) {
+	if !ValidSlots[slot] {
+		return Log{}, nil, ErrInvalidSlot
+	}
+
 	results := s.matcher.ResolveItems(ctx, items)
 
 	logItems := make([]LogItem, 0, len(results))
@@ -59,7 +64,7 @@ func (s *Service) Save(ctx context.Context, userID int, items []ItemRequest) (Lo
 		})
 	}
 
-	log, err := s.repo.Save(ctx, userID, logItems)
+	log, err := s.repo.Save(ctx, userID, slot, logItems)
 	if err != nil {
 		return Log{}, nil, err
 	}

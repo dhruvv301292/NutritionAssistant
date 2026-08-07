@@ -1,8 +1,18 @@
 import { useState } from 'react'
-import type { ChatMealResponse, ItemResult } from './types'
+import type { ChatMealResponse, ItemResult, Slot } from './types'
 import EstimateFoodForm, { needsEstimate } from './EstimateFoodForm'
 
 const CURRENT_USER_ID = 1
+const SLOTS: Slot[] = ['breakfast', 'lunch', 'dinner', 'snack']
+const SLOT_LABEL: Record<Slot, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' }
+
+function suggestedSlot(): Slot {
+  const h = new Date().getHours()
+  if (h >= 5 && h < 11) return 'breakfast'
+  if (h >= 11 && h < 16) return 'lunch'
+  if (h >= 16 && h < 22) return 'dinner'
+  return 'snack'
+}
 
 type ChatMessage =
   | { role: 'user', text: string }
@@ -66,6 +76,7 @@ export default function ChatMeal({ onLogged }: Props) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const [slot, setSlot] = useState<Slot>(suggestedSlot)
 
   async function sendText(text: string, { echoAsUserMessage }: { echoAsUserMessage: boolean }) {
     if (text === '' || loading) return
@@ -119,7 +130,7 @@ export default function ChatMeal({ onLogged }: Props) {
     const res = await fetch('/api/meals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: CURRENT_USER_ID, items }),
+      body: JSON.stringify({ user_id: CURRENT_USER_ID, slot, items }),
     })
     if (!res.ok) return
 
@@ -132,6 +143,18 @@ export default function ChatMeal({ onLogged }: Props) {
   return (
     <div className="chat-meal">
       <h2>Log a Meal (natural language)</h2>
+      <div className="meal-slot-row">
+        {SLOTS.map(s => (
+          <button
+            type="button"
+            key={s}
+            className={s === slot ? 'meal-slot-chip meal-slot-chip-active' : 'meal-slot-chip'}
+            onClick={() => setSlot(s)}
+          >
+            {SLOT_LABEL[s]}
+          </button>
+        ))}
+      </div>
       <div className="chat-history">
         {messages.map((message, i) => {
           if (message.role === 'user') {

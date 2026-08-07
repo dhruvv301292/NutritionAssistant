@@ -1,5 +1,4 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals, CURRENT_USER_ID } from '../api/client';
@@ -14,7 +13,7 @@ const FIELDS: { key: FieldKey; label: string; step: number }[] = [
   { key: 'fiber_goal', label: 'Fiber (g)', step: 5 },
 ];
 
-export default function GoalsScreen() {
+export default function GoalsScreen({ focused }: { focused: boolean }) {
   const [goals, setGoals] = useState<Goals | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +25,7 @@ export default function GoalsScreen() {
       .catch(() => setError('Could not load goals.'));
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => { if (focused) load(); }, [focused, load]);
 
   function adjust(key: FieldKey, delta: number) {
     setGoals((prev) => (prev ? { ...prev, [key]: Math.max(0, prev[key] + delta) } : prev));

@@ -1,11 +1,11 @@
-import type { ChatMealResponse, DailySummary, Goals, MealLog, NutritionEstimate } from '../types/api';
+import type { ChatMealResponse, DailySummary, Goals, MealLog, NutritionEstimate, Slot } from '../types/api';
 
 // Defaults to the deployed backend so the app works without any local setup.
 // For local backend development, set EXPO_PUBLIC_API_BASE_URL to your
 // machine's LAN IP (Expo's dev server prints this as "Metro waiting on
 // exp://<ip>:8081") — "localhost" on a physical device/simulator refers to
 // the phone itself, not the dev machine.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://nutrichat-api.fly.dev';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://nutritionassistant-1r9y.onrender.com';
 
 const CURRENT_USER_ID = 1;
 
@@ -25,10 +25,13 @@ export function chatMeal(text: string): Promise<ChatMealResponse> {
   return request('/chat/meal', { method: 'POST', body: JSON.stringify({ text }) });
 }
 
-export function saveMeal(items: { food_name: string; quantity: number; unit: string }[]): Promise<MealLog> {
+export function saveMeal(
+  items: { food_name: string; quantity: number; unit: string }[],
+  slot: Slot
+): Promise<MealLog> {
   return request('/meals', {
     method: 'POST',
-    body: JSON.stringify({ user_id: CURRENT_USER_ID, items }),
+    body: JSON.stringify({ user_id: CURRENT_USER_ID, slot, items }),
   });
 }
 

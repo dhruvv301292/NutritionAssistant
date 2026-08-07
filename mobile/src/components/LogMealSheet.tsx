@@ -18,7 +18,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { chatMeal, saveMeal } from '../api/client';
 import { colors, fonts, radius, shadow } from '../theme';
-import type { ChatMealResponse } from '../types/api';
+import { SLOT_LABEL, SLOT_ORDER, suggestedSlot } from '../slots';
+import type { ChatMealResponse, Slot } from '../types/api';
 import NutritionTags from './NutritionTags';
 import EstimateFoodForm, { needsEstimate } from './EstimateFoodForm';
 
@@ -38,6 +39,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
+  const [slot, setSlot] = useState<Slot>(() => suggestedSlot(new Date()));
 
   useSpeechRecognitionEvent('start', () => setListening(true));
   useSpeechRecognitionEvent('end', () => setListening(false));
@@ -92,7 +94,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
       .map((item) => ({ food_name: item.matched_food!.name, quantity: item.quantity, unit: item.unit }));
     if (items.length === 0) return;
     try {
-      await saveMeal(items);
+      await saveMeal(items, slot);
       setEntries((prev) =>
         prev.map((e, i) => (i === index && e.role === 'assistant' ? { ...e, saved: true } : e))
       );
@@ -105,6 +107,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
   function handleClose() {
     setEntries([]);
     setInput('');
+    setSlot(suggestedSlot(new Date()));
     onClose();
   }
 
@@ -120,6 +123,23 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
           <Pressable onPress={handleClose} style={styles.closeButton}>
             <Text style={styles.closeButtonText}>✕</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.slotRow}>
+          {SLOT_ORDER.map((s) => {
+            const active = s === slot;
+            return (
+              <Pressable
+                key={s}
+                onPress={() => setSlot(s)}
+                style={[styles.slotChip, { backgroundColor: active ? colors.accent : colors.neutral200 }]}
+              >
+                <Text style={[styles.slotChipText, { color: active ? colors.bg : colors.text }]}>
+                  {SLOT_LABEL[s]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <ScrollView style={styles.chatArea} contentContainerStyle={{ gap: 10, paddingBottom: 10 }}>
@@ -247,6 +267,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeButtonText: { fontFamily: fonts.body, fontSize: 14, color: colors.text },
+  slotRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 18, paddingBottom: 10 },
+  slotChip: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.pill },
+  slotChipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5 },
   chatArea: { paddingHorizontal: 18, minHeight: 120 },
   bubble: { maxWidth: '78%', padding: 10, borderRadius: radius.lg, borderTopLeftRadius: 8 },
   userBubble: { alignSelf: 'flex-end', backgroundColor: colors.accent, borderTopLeftRadius: radius.lg, borderTopRightRadius: 8 },

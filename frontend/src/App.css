@@ -17,6 +17,27 @@
   padding: 16px;
 }
 
+.meal-slot-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.meal-slot-chip {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ccc);
+  background: transparent;
+  cursor: pointer;
+}
+
+.meal-slot-chip-active {
+  background: var(--accent, #333);
+  color: #fff;
+  border-color: var(--accent, #333);
+}
+
 .chat-history {
   display: flex;
   flex-direction: column;
