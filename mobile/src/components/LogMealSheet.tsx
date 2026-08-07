@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -40,6 +40,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
   const [slot, setSlot] = useState<Slot>(() => suggestedSlot(new Date()));
+  const textInputRef = useRef<TextInput>(null);
 
   useSpeechRecognitionEvent('start', () => setListening(true));
   useSpeechRecognitionEvent('end', () => setListening(false));
@@ -112,7 +113,13 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
+      onShow={() => textInputRef.current?.focus()}
+    >
       <Pressable style={styles.backdrop} onPress={handleClose} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -217,6 +224,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
             <Feather name="mic" size={17} color={listening ? colors.bg : colors.accent700} />
           </Pressable>
           <TextInput
+            ref={textInputRef}
             style={styles.textInput}
             value={input}
             onChangeText={setInput}
