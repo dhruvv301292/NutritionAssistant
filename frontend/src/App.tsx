@@ -1,137 +1,111 @@
 import { useEffect, useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
+import type { Food } from './types'
+import MealLogger from './MealLogger'
+import Dashboard from './Dashboard'
+import ChatMeal from './ChatMeal'
 
-type Food ={
-  name: string,
+type DisplayNutrition = {
+  label: string,
   calories: number,
   protein: number,
   carbs: number,
   fat: number,
+  fiber: number,
+}
+
+function displayNutrition(food: Food): DisplayNutrition {
+  if (food.unit === 'grams') {
+    const scale = 100 / food.unitquantity
+    return {
+      label: 'per 100g',
+      calories: food.calories * scale,
+      protein: food.protein * scale,
+      carbs: food.carbs * scale,
+      fat: food.fat * scale,
+      fiber: food.fiber * scale,
+    }
+  }
+  return {
+    label: `per ${food.unitquantity} ${food.unit}`,
+    calories: food.calories,
+    protein: food.protein,
+    carbs: food.carbs,
+    fat: food.fat,
+    fiber: food.fiber,
+  }
+}
+
+function FoodSearch() {
+  const [query, setQuery] = useState('')
+  const [foods, setFoods] = useState<Food[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (query.trim().length === 0) {
+      setFoods([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetch(`/api/foods/search?q=${encodeURIComponent(query)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('search failed')
+        return res.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        setFoods(data)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError('Could not search foods. Try again.')
+      })
+      .finally(() => {
+        if (cancelled) return
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [query])
+
+  return (
+    <div className="food-search">
+      <h2>Food Search</h2>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search foods…" />
+      {loading && <p>Searching…</p>}
+      {error && <p className="error">{error}</p>}
+      {!loading && !error && query.trim().length > 0 && foods.length === 0 && (
+        <p>No foods found for "{query}".</p>
+      )}
+      {foods.map((food) => {
+        const nutrition = displayNutrition(food)
+        return (
+          <div key={food.id}>
+            <strong>{food.name}</strong> ({nutrition.label}): {nutrition.calories.toFixed(0)} cal,{' '}
+            {nutrition.protein.toFixed(1)}g protein, {nutrition.carbs.toFixed(1)}g carbs,{' '}
+            {nutrition.fat.toFixed(1)}g fat, {nutrition.fiber.toFixed(1)}g fiber
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function App() {
-  const [query, setQuery] = useState('')
-  const [foods, setFoods] = useState<Food[]>([])
-  useEffect(() => {
-    if (query.length === 0) {
-      setFoods([])
-      return
-    }
-    fetch(`\/api/foods/search?q=${query}`)
-      .then((res) => res.json())
-      .then((data) => setFoods(data))
-  }, [query])
+  const [refreshKey, setRefreshKey] = useState(0)
+
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} />
-          {foods.map((food) => (
-            <div key={food.name}>
-              {food.name} - {food.calories} calories
-            </div>
-          ))}
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <section id="center">
+      <h1>Nutrition Assistant</h1>
+      <FoodSearch />
+      <MealLogger onSaved={() => setRefreshKey(k => k + 1)} />
+      <ChatMeal onLogged={() => setRefreshKey(k => k + 1)} />
+      <Dashboard refreshKey={refreshKey} />
+    </section>
   )
 }
 

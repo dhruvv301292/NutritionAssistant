@@ -1,6 +1,7 @@
 package nutrition
 
 type Food struct {
+	ID           int     `json:"id"`
 	Name         string  `json:"name"`
 	Calories     float64 `json:"calories"`
 	Protein      float64 `json:"protein"`

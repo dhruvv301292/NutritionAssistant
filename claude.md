@@ -32,32 +32,6 @@ The app should:
 
 ---
 
-## How You Should Coach Me
-
-Act as my instructor, tutor, and code reviewer.
-
-For each task:
-
-1. Explain the concept before giving code.
-2. Ask me to attempt the implementation first if you think we have already covered the concepts required, else give me the boiler plate and let me ask questions as I implement. If I ask you to implement it, break down what has been implemented to facilitate understanding.
-3. Review my code critically.
-4. Explain mistakes in plain language.
-5. Encourage clean architecture, not shortcuts.
-6. Keep the project resume-quality.
-7. Help me understand why each design choice matters.
-
-When giving code:
-
-- Prefer small, focused snippets over huge copy-paste files.
-- Explain where each file goes.
-- Explain what each function or component is responsible for.
-- Show me test examples.
-- Point out edge cases.
-
-Do not let me rely on the LLM for nutrition math. The backend should calculate nutrition deterministically.
-
----
-
 ## Stack
 
 Frontend:
@@ -327,7 +301,7 @@ Day 14:
 
 Day 15:
 - Improve React food search UI
-- Show serving size and nutrition per 100g
+- Show serving size and nutrition per 100g or per serving
 
 ---
 
@@ -461,11 +435,12 @@ Day 32:
 Day 33:
 - Write resume bullets
 
-Suggested resume bullets:
-- Built an AI-powered nutrition assistant using React, TypeScript, Go, and PostgreSQL to parse natural language meal logs and calculate calories, macros, and fiber.
-- Designed a Go nutrition engine with typed domain models, unit conversion, deterministic food matching, ambiguity detection, and concurrent ingredient lookup.
-- Integrated LLM structured outputs to convert free-form meal descriptions into validated backend requests while keeping nutrition calculations deterministic in Go.
-- Implemented daily meal logging, nutrition summaries, and reusable APIs designed for future MCP and mobile app integration.
+Resume bullets:
+- Built a full-stack AI nutrition assistant (React/TypeScript, Go, PostgreSQL) that parses natural-language meal logs (e.g. "230g chicken thighs and a Quest shake") into calculated calories, protein, carbs, fat, and fiber, with a chat UI and structured logging form sharing one backend nutrition engine.
+- Designed a Go nutrition engine with a repository/service architecture, typed domain models, unit conversion (weight and count-based foods via a stored grams-per-unit reference), and Postgres trigram (pg_trgm) fuzzy food matching with similarity-gap ambiguity detection.
+- Implemented concurrent multi-ingredient resolution in Go using goroutines and errgroup, resolving each ingredient in a meal independently while preserving result order; covered with unit and race-detector tests (go test -race).
+- Integrated the Anthropic Claude API using tool-use with an enum-constrained JSON schema to convert free-form meal text into validated structured requests, keeping all nutrition math deterministic and outside the LLM's responsibility.
+- Implemented meal logging with transactional saves, daily nutrition summaries computed from live (non-snapshotted) food data, and a clarification flow that surfaces ambiguous or unmatched ingredients to the user instead of guessing.
 
 ---
 
