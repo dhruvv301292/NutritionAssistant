@@ -2,6 +2,8 @@
   "expo": {
     "name": "mobile",
     "slug": "mobile",
+    "owner": "dhruvv301292",
+    "scheme": "nutrichat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -37,7 +39,14 @@
           "speechRecognitionPermission": "Allow Nutrition Assistant to use speech recognition to log meals by voice."
         }
       ],
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cff921b2-dd7b-47f6-8a04-70126ee2274c"
+      }
+    }
   }
 }

@@ -51,9 +51,8 @@ type LogItem struct {
 }
 
 type SaveRequest struct {
-	UserID int           `json:"user_id"`
-	Slot   string        `json:"slot"`
-	Items  []ItemRequest `json:"items"`
+	Slot  string        `json:"slot"`
+	Items []ItemRequest `json:"items"`
 }
 
 var ValidSlots = map[string]bool{

@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dhruvv301292/nutrichat/internal/ai"
+	"github.com/dhruvv301292/nutrichat/internal/auth"
 	"github.com/dhruvv301292/nutrichat/internal/foods"
 	"github.com/dhruvv301292/nutrichat/internal/goals"
 	"github.com/dhruvv301292/nutrichat/internal/meals"
 	"github.com/dhruvv301292/nutrichat/internal/nutrition"
+	"github.com/dhruvv301292/nutrichat/internal/users"
 	"log"
 	"net/http"
 )
@@ -18,10 +20,84 @@ type Handler struct {
 	mealService *meals.Service
 	aiClient    *ai.Client
 	goalsRepo   *goals.Repository
+	usersRepo   *users.Repository
+	authSigner  *auth.Signer
+	googleAuds  []string
 }
 
-func NewHandler(food *foods.Service, meal *meals.Service, aiClient *ai.Client, goalsRepo *goals.Repository) *Handler {
-	return &Handler{foodService: food, mealService: meal, aiClient: aiClient, goalsRepo: goalsRepo}
+func NewHandler(food *foods.Service, meal *meals.Service, aiClient *ai.Client, goalsRepo *goals.Repository, usersRepo *users.Repository, authSigner *auth.Signer, googleAuds []string) *Handler {
+	return &Handler{
+		foodService: food,
+		mealService: meal,
+		aiClient:    aiClient,
+		goalsRepo:   goalsRepo,
+		usersRepo:   usersRepo,
+		authSigner:  authSigner,
+		googleAuds:  googleAuds,
+	}
+}
+
+type GoogleLoginRequest struct {
+	IDToken string `json:"id_token"`
+}
+
+type GoogleLoginResponse struct {
+	Token string     `json:"token"`
+	User  users.User `json:"user"`
+}
+
+// GoogleLogin verifies a Google-issued ID token (obtained client-side via
+// expo-auth-session), upserts the corresponding user, and issues our own
+// session JWT — the token the client sends on every subsequent request.
+// Google is only consulted here, not on the hot path.
+func (h *Handler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req GoogleLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IDToken == "" {
+		http.Error(w, "id_token is required", http.StatusBadRequest)
+		return
+	}
+
+	claims, err := auth.VerifyGoogleIDToken(r.Context(), req.IDToken, h.googleAuds)
+	if err != nil {
+		log.Printf("GoogleLogin: %v", err)
+		http.Error(w, "invalid google id token", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.usersRepo.UpsertGoogleUser(r.Context(), claims.Sub, claims.Email, claims.Name)
+	if err != nil {
+		log.Printf("GoogleLogin: upsert user: %v", err)
+		http.Error(w, "failed to sign in", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := h.authSigner.IssueSession(user.ID)
+	if err != nil {
+		log.Printf("GoogleLogin: issue session: %v", err)
+		http.Error(w, "failed to sign in", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(GoogleLoginResponse{Token: token, User: user})
+}
+
+// Me returns the authenticated user's profile — used on app cold start to
+// resolve a stored session token back into a User without re-running the
+// Google sign-in flow.
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.usersRepo.FindByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "failed to fetch user", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
 }
 
 func Health(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +172,11 @@ func (h *Handler) CalculateMeal(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return
+	}
 	var req meals.SaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -105,7 +186,7 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "items must not be empty", http.StatusBadRequest)
 		return
 	}
-	log, itemResults, err := h.mealService.Save(r.Context(), req.UserID, req.Slot, req.Items)
+	log, itemResults, err := h.mealService.Save(r.Context(), userID, req.Slot, req.Items)
 	if err != nil {
 		if errors.Is(err, meals.ErrUnresolvedItems) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -127,9 +208,9 @@ func (h *Handler) SaveMeal(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) MealsToday(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID, err := parseUserID(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
 		return
 	}
 	logs, err := h.mealService.Today(r.Context(), userID)
@@ -142,9 +223,9 @@ func (h *Handler) MealsToday(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DailySummary(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID, err := parseUserID(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
 		return
 	}
 	date := r.URL.Query().Get("date")
@@ -297,9 +378,9 @@ func (h *Handler) ChatMeal(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetGoals(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID, err := parseUserID(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
 		return
 	}
 	g, err := h.goalsRepo.Get(r.Context(), userID)
@@ -312,31 +393,21 @@ func (h *Handler) GetGoals(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PutGoals(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return
+	}
 	var g goals.Goals
 	if err := json.NewDecoder(r.Body).Decode(&g); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if g.UserID == 0 {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
-		return
-	}
+	g.UserID = userID
 	saved, err := h.goalsRepo.Upsert(r.Context(), g)
 	if err != nil {
 		http.Error(w, "failed to save goals", http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(saved)
-}
-
-func parseUserID(r *http.Request) (int, error) {
-	raw := r.URL.Query().Get("user_id")
-	if raw == "" {
-		return 0, errors.New("user_id query parameter is required")
-	}
-	var userID int
-	if _, err := fmt.Sscanf(raw, "%d", &userID); err != nil {
-		return 0, errors.New("user_id must be an integer")
-	}
-	return userID, nil
 }

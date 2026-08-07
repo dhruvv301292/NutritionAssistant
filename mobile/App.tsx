@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { Feather } from '@expo/vector-icons';
 import { useFonts, Caprasimo_400Regular } from '@expo-google-fonts/caprasimo';
@@ -13,6 +13,8 @@ import {
 import TodayScreen from './src/screens/TodayScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import GoalsScreen from './src/screens/GoalsScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { colors, fonts } from './src/theme';
 
 const PAGES = [
@@ -40,6 +42,51 @@ function TabBar({ activeIndex, onSelect }: { activeIndex: number; onSelect: (i: 
   );
 }
 
+function MainTabs() {
+  const [activeIndex, setActiveIndex] = useState(INITIAL_PAGE);
+  const pagerRef = useRef<PagerView>(null);
+
+  function selectPage(i: number) {
+    pagerRef.current?.setPage(i);
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={INITIAL_PAGE}
+        onPageSelected={(e) => setActiveIndex(e.nativeEvent.position)}
+      >
+        {PAGES.map((page, i) => (
+          <View key={page.key} style={{ flex: 1 }}>
+            <page.Screen focused={activeIndex === i} />
+          </View>
+        ))}
+      </PagerView>
+      <TabBar activeIndex={activeIndex} onSelect={selectPage} />
+    </View>
+  );
+}
+
+function Root() {
+  const { state } = useAuth();
+
+  if (state.status === 'loading') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.accent700} />
+      </View>
+    );
+  }
+
+  if (state.status === 'signedOut') {
+    return <LoginScreen />;
+  }
+
+  return <MainTabs />;
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     Caprasimo_400Regular,
@@ -47,34 +94,16 @@ export default function App() {
     Figtree_600SemiBold,
     Figtree_700Bold,
   });
-  const [activeIndex, setActiveIndex] = useState(INITIAL_PAGE);
-  const pagerRef = useRef<PagerView>(null);
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   }
 
-  function selectPage(i: number) {
-    pagerRef.current?.setPage(i);
-  }
-
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <PagerView
-          ref={pagerRef}
-          style={{ flex: 1 }}
-          initialPage={INITIAL_PAGE}
-          onPageSelected={(e) => setActiveIndex(e.nativeEvent.position)}
-        >
-          {PAGES.map((page, i) => (
-            <View key={page.key} style={{ flex: 1 }}>
-              <page.Screen focused={activeIndex === i} />
-            </View>
-          ))}
-        </PagerView>
-        <TabBar activeIndex={activeIndex} onSelect={selectPage} />
-      </View>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
       <StatusBar style="dark" />
     </SafeAreaProvider>
   );

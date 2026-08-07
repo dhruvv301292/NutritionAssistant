@@ -4,13 +4,16 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"github.com/dhruvv301292/nutrichat/internal/ai"
 	"github.com/dhruvv301292/nutrichat/internal/api"
+	"github.com/dhruvv301292/nutrichat/internal/auth"
 	"github.com/dhruvv301292/nutrichat/internal/db"
 	"github.com/dhruvv301292/nutrichat/internal/foods"
 	"github.com/dhruvv301292/nutrichat/internal/fooddata"
 	"github.com/dhruvv301292/nutrichat/internal/goals"
 	"github.com/dhruvv301292/nutrichat/internal/meals"
+	"github.com/dhruvv301292/nutrichat/internal/users"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"github.com/joho/godotenv"
@@ -77,24 +80,43 @@ func main() {
 
 	goalsRepo := goals.NewRepository(pool)
 
-	handler := api.NewHandler(foodService, mealService, aiClient, goalsRepo)
+	usersRepo := users.NewRepository(pool)
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET must be set")
+	}
+	authSigner := auth.NewSigner(jwtSecret)
+
+	var googleAuds []string
+	if auds := os.Getenv("GOOGLE_OAUTH_CLIENT_IDS"); auds != "" {
+		googleAuds = strings.Split(auds, ",")
+	}
+
+	handler := api.NewHandler(foodService, mealService, aiClient, goalsRepo, usersRepo, authSigner, googleAuds)
 
 	r := chi.NewRouter()
 	r.Use(corsMiddleware)
 	r.Get("/health", api.Health)
+	r.Post("/auth/google", handler.GoogleLogin)
 	r.Get("/foods", handler.ListFoods)
 	r.Get("/foods/search", handler.SearchFoods)
 	r.Post("/foods/estimate", handler.EstimateFood)
 	r.Post("/foods", handler.CreateFood)
 	r.Post("/nutrition/calculate", handler.CalculateNutrition)
 	r.Post("/meals/calculate", handler.CalculateMeal)
-	r.Post("/meals", handler.SaveMeal)
-	r.Get("/meals/today", handler.MealsToday)
-	r.Get("/summary/daily", handler.DailySummary)
 	r.Post("/ai/parse-meal", handler.ParseMeal)
 	r.Post("/chat/meal", handler.ChatMeal)
-	r.Get("/goals", handler.GetGoals)
-	r.Put("/goals", handler.PutGoals)
+
+	r.Group(func(r chi.Router) {
+		r.Use(authSigner.RequireAuth)
+		r.Get("/me", handler.Me)
+		r.Post("/meals", handler.SaveMeal)
+		r.Get("/meals/today", handler.MealsToday)
+		r.Get("/summary/daily", handler.DailySummary)
+		r.Get("/goals", handler.GetGoals)
+		r.Put("/goals", handler.PutGoals)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

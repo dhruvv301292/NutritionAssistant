@@ -97,3 +97,10 @@ export type NutritionEstimate = {
   unit: string;
   unitquantity: number;
 };
+
+export type User = {
+  id: number;
+  email: string;
+  name: string;
+  created_at: string;
+};
