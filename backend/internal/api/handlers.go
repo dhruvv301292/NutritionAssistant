@@ -9,6 +9,7 @@ import (
 	"github.com/dhruvv301292/nutrichat/internal/goals"
 	"github.com/dhruvv301292/nutrichat/internal/meals"
 	"github.com/dhruvv301292/nutrichat/internal/nutrition"
+	"log"
 	"net/http"
 )
 
@@ -46,6 +47,7 @@ func (h *Handler) SearchFoods(w http.ResponseWriter, r *http.Request) {
 	queryFood := r.URL.Query().Get("q")
 	response, err := h.foodService.Search(r.Context(), queryFood)
 	if err != nil {
+		log.Printf("SearchFoods: %v", err)
 		http.Error(w, "failed to search foods", http.StatusInternalServerError)
 		return
 	}
