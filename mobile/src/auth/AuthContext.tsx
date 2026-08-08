@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getMe, googleLogin, setUnauthorizedHandler } from '../api/client';
+import { appleLogin, getMe, googleLogin, setUnauthorizedHandler } from '../api/client';
 import { clearStoredToken, getStoredToken, setStoredToken } from './tokenStorage';
 import type { User } from '../types/api';
 
@@ -11,6 +11,7 @@ type AuthState =
 type AuthContextValue = {
   state: AuthState;
   signInWithGoogleIdToken: (idToken: string) => Promise<void>;
+  signInWithAppleIdToken: (idToken: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   handleUnauthorized: () => Promise<void>;
 };
@@ -45,6 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedIn', user });
   }, []);
 
+  const signInWithAppleIdToken = useCallback(async (idToken: string, name: string) => {
+    const { token, user } = await appleLogin(idToken, name);
+    await setStoredToken(token);
+    setState({ status: 'signedIn', user });
+  }, []);
+
   const signOut = useCallback(async () => {
     await clearStoredToken();
     setState({ status: 'signedOut' });
@@ -62,7 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [handleUnauthorized]);
 
   return (
-    <AuthContext.Provider value={{ state, signInWithGoogleIdToken, signOut, handleUnauthorized }}>
+    <AuthContext.Provider
+      value={{ state, signInWithGoogleIdToken, signInWithAppleIdToken, signOut, handleUnauthorized }}
+    >
       {children}
     </AuthContext.Provider>
   );

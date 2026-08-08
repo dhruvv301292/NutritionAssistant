@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { dailySummary, getGoals } from '../api/client';
+import AccountButton from '../components/AccountButton';
 import CaloriesCard from '../components/CaloriesCard';
 import LogMealSheet from '../components/LogMealSheet';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
@@ -47,6 +48,7 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
           <Text style={styles.title}>Today</Text>
           <Text style={styles.dateLabel}>{formatDateLabel(now)}</Text>
         </View>
+        <AccountButton />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -110,7 +112,14 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  headerRow: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 14 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 2,
+    paddingBottom: 14,
+  },
   title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   dateLabel: { fontFamily: fonts.body, fontSize: 12.5, color: colors.accent700, marginTop: 2 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 8, gap: 12 },

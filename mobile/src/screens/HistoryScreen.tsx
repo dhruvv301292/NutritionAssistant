@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { dailySummary, getGoals } from '../api/client';
+import AccountButton from '../components/AccountButton';
 import CaloriesCard from '../components/CaloriesCard';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
@@ -83,7 +84,10 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Text style={styles.title}>History</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>History</Text>
+        <AccountButton />
+      </View>
 
       <View style={styles.weekdayRow}>
         {WEEKDAY_LABELS.map((label) => (
@@ -226,7 +230,14 @@ function groupBySlot(meals: MealLog[]): Partial<Record<string, MealLog[]>> {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text, paddingHorizontal: 20, marginBottom: 10 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   weekdayRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 8 },
   weekdayLabel: { flex: 1, textAlign: 'center', fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.text, opacity: 0.5, textTransform: 'uppercase' },
   weekPager: { height: 66, marginBottom: 16 },

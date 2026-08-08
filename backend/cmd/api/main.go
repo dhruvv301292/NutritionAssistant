@@ -93,12 +93,18 @@ func main() {
 		googleAuds = strings.Split(auds, ",")
 	}
 
-	handler := api.NewHandler(foodService, mealService, aiClient, goalsRepo, usersRepo, authSigner, googleAuds)
+	var appleAuds []string
+	if auds := os.Getenv("APPLE_OAUTH_AUDIENCES"); auds != "" {
+		appleAuds = strings.Split(auds, ",")
+	}
+
+	handler := api.NewHandler(foodService, mealService, aiClient, goalsRepo, usersRepo, authSigner, googleAuds, appleAuds)
 
 	r := chi.NewRouter()
 	r.Use(corsMiddleware)
 	r.Get("/health", api.Health)
 	r.Post("/auth/google", handler.GoogleLogin)
+	r.Post("/auth/apple", handler.AppleLogin)
 	r.Get("/foods", handler.ListFoods)
 	r.Get("/foods/search", handler.SearchFoods)
 	r.Post("/foods/estimate", handler.EstimateFood)

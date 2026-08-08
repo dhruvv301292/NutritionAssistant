@@ -14,7 +14,8 @@
         "NSSpeechRecognitionUsageDescription": "Allow Nutrition Assistant to use speech recognition to log meals by voice.",
         "NSMicrophoneUsageDescription": "Allow Nutrition Assistant to use the microphone to log meals by voice."
       },
-      "bundleIdentifier": "com.dhruvvashisht.nutrichat"
+      "bundleIdentifier": "com.dhruvvashisht.nutrichat",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +27,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.dhruvvashisht.nutrichat"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +43,8 @@
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {

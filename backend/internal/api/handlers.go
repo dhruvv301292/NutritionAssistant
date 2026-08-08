@@ -23,9 +23,10 @@ type Handler struct {
 	usersRepo   *users.Repository
 	authSigner  *auth.Signer
 	googleAuds  []string
+	appleAuds   []string
 }
 
-func NewHandler(food *foods.Service, meal *meals.Service, aiClient *ai.Client, goalsRepo *goals.Repository, usersRepo *users.Repository, authSigner *auth.Signer, googleAuds []string) *Handler {
+func NewHandler(food *foods.Service, meal *meals.Service, aiClient *ai.Client, goalsRepo *goals.Repository, usersRepo *users.Repository, authSigner *auth.Signer, googleAuds []string, appleAuds []string) *Handler {
 	return &Handler{
 		foodService: food,
 		mealService: meal,
@@ -34,6 +35,7 @@ func NewHandler(food *foods.Service, meal *meals.Service, aiClient *ai.Client, g
 		usersRepo:   usersRepo,
 		authSigner:  authSigner,
 		googleAuds:  googleAuds,
+		appleAuds:   appleAuds,
 	}
 }
 
@@ -80,6 +82,54 @@ func (h *Handler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(GoogleLoginResponse{Token: token, User: user})
+}
+
+type AppleLoginRequest struct {
+	IDToken string `json:"id_token"`
+	// Name is only present client-side on the user's very first-ever Apple
+	// sign-in — Apple includes it in the initial authorization credential,
+	// not in the identity token itself, and never resends it afterward.
+	Name string `json:"name"`
+}
+
+type AppleLoginResponse struct {
+	Token string     `json:"token"`
+	User  users.User `json:"user"`
+}
+
+// AppleLogin verifies an Apple-issued identity token (obtained client-side
+// via expo-apple-authentication), upserts the corresponding user, and
+// issues our own session JWT — same shape as GoogleLogin.
+func (h *Handler) AppleLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req AppleLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IDToken == "" {
+		http.Error(w, "id_token is required", http.StatusBadRequest)
+		return
+	}
+
+	claims, err := auth.VerifyAppleIDToken(r.Context(), req.IDToken, h.appleAuds)
+	if err != nil {
+		log.Printf("AppleLogin: %v", err)
+		http.Error(w, "invalid apple id token", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.usersRepo.UpsertAppleUser(r.Context(), claims.Sub, claims.Email, req.Name)
+	if err != nil {
+		log.Printf("AppleLogin: upsert user: %v", err)
+		http.Error(w, "failed to sign in", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := h.authSigner.IssueSession(user.ID)
+	if err != nil {
+		log.Printf("AppleLogin: issue session: %v", err)
+		http.Error(w, "failed to sign in", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(AppleLoginResponse{Token: token, User: user})
 }
 
 // Me returns the authenticated user's profile — used on app cold start to

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../auth/AuthContext';
 import { useGoogleSignIn } from '../auth/googleSignIn';
 import { colors, fonts, radius, shadow } from '../theme';
 
 export default function LoginScreen() {
-  const { signInWithGoogleIdToken } = useAuth();
+  const { signInWithGoogleIdToken, signInWithAppleIdToken } = useAuth();
   const [request, response, promptAsync] = useGoogleSignIn();
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,34 @@ export default function LoginScreen() {
       .catch(() => setError('Could not sign in. Try again.'))
       .finally(() => setSigningIn(false));
   }, [response, signInWithGoogleIdToken]);
+
+  async function handleApplePress() {
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        setError('Could not sign in. Try again.');
+        return;
+      }
+      setSigningIn(true);
+      // Apple only includes the name in this initial credential, on the
+      // user's very first-ever sign-in — never again after that.
+      const name = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ');
+      await signInWithAppleIdToken(credential.identityToken, name);
+    } catch (err: any) {
+      if (err?.code === 'ERR_REQUEST_CANCELED') return;
+      setError('Could not sign in. Try again.');
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -38,6 +67,16 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>Continue with Google</Text>
           )}
         </Pressable>
+
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={radius.pill}
+            style={styles.appleButton}
+            onPress={handleApplePress}
+          />
+        )}
 
         {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
@@ -59,5 +98,6 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   buttonText: { color: colors.bg, fontFamily: fonts.heading, fontSize: 15 },
+  appleButton: { width: 220, height: 48, marginTop: 10 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 13, marginTop: 12 },
 });

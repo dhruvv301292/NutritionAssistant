@@ -41,6 +41,10 @@ export function googleLogin(idToken: string): Promise<{ token: string; user: Use
   return request('/auth/google', { method: 'POST', body: JSON.stringify({ id_token: idToken }) });
 }
 
+export function appleLogin(idToken: string, name: string): Promise<{ token: string; user: User }> {
+  return request('/auth/apple', { method: 'POST', body: JSON.stringify({ id_token: idToken, name }) });
+}
+
 export function getMe(): Promise<User> {
   return request('/me');
 }

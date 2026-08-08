@@ -34,6 +34,9 @@ type Props = {
   onMealSaved: () => void;
 };
 
+const MIN_INPUT_HEIGHT = 40;
+const MAX_INPUT_HEIGHT = 110;
+
 export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
   const [input, setInput] = useState('');
   const [entries, setEntries] = useState<ChatEntry[]>([]);
@@ -223,15 +226,16 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
           >
             <Feather name="mic" size={17} color={listening ? colors.bg : colors.accent700} />
           </Pressable>
-          <TextInput
-            ref={textInputRef}
-            style={styles.textInput}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Describe what you ate…"
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-          />
+          <View style={styles.textInputWrapper}>
+            <TextInput
+              ref={textInputRef}
+              style={styles.textInput}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Describe what you ate…"
+              multiline
+            />
+          </View>
           <Pressable
             onPress={handleSend}
             disabled={input.trim().length === 0}
@@ -303,13 +307,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: colors.surface,
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     padding: 6,
     margin: 16,
     ...shadow.md,
   },
   micButton: { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  textInput: { fontFamily: fonts.body, flex: 1, fontSize: 14, color: colors.text, paddingHorizontal: 8 },
+  textInputWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: MIN_INPUT_HEIGHT,
+    maxHeight: MAX_INPUT_HEIGHT,
+  },
+  textInput: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.text,
+    paddingHorizontal: 8,
+    maxHeight: MAX_INPUT_HEIGHT,
+  },
   sendButton: {
     width: 40,
     height: 40,

@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import AccountButton from '../components/AccountButton';
 import { colors, fonts, radius, shadow } from '../theme';
 import type { Goals } from '../types/api';
 
@@ -15,7 +16,7 @@ const FIELDS: { key: FieldKey; label: string; step: number }[] = [
 ];
 
 export default function GoalsScreen({ focused }: { focused: boolean }) {
-  const { state, signOut } = useAuth();
+  const { state } = useAuth();
   const [goals, setGoals] = useState<Goals | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,10 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Text style={styles.title}>Goals</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Goals</Text>
+        <AccountButton />
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {error && <Text style={styles.errorText}>{error}</Text>}
@@ -81,15 +85,9 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
               <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save goals'}</Text>
             </Pressable>
 
-            <View style={styles.accountSection}>
-              <Text style={styles.kicker}>Account</Text>
-              {state.status === 'signedIn' && (
-                <Text style={styles.accountEmail}>{state.user.email}</Text>
-              )}
-              <Pressable style={styles.signOutButton} onPress={signOut}>
-                <Text style={styles.signOutButtonText}>Sign out</Text>
-              </Pressable>
-            </View>
+            {state.status === 'signedIn' && (
+              <Text style={styles.accountEmail}>{state.user.email}</Text>
+            )}
           </>
         )}
       </ScrollView>
@@ -99,7 +97,14 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text, paddingHorizontal: 20, marginBottom: 10 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
   kicker: { fontSize: 14, fontFamily: fonts.heading, color: colors.text, marginBottom: 10 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14, marginBottom: 12 },
@@ -124,13 +129,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonText: { color: colors.bg, fontFamily: fonts.heading, fontSize: 14 },
-  accountSection: { marginTop: 28 },
-  accountEmail: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.6, marginBottom: 12 },
-  signOutButton: {
-    backgroundColor: colors.neutral200,
-    borderRadius: radius.pill,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  signOutButtonText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.text },
+  accountEmail: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.5, marginTop: 20, textAlign: 'center' },
 });

@@ -65,6 +65,10 @@ export default function EstimateFoodForm({ foodName, onSaved, externalMatch }: P
     setEstimate((prev) => (prev ? { ...prev, [key]: parseFloat(value) || 0 } : prev));
   }
 
+  function updateUnitQuantity(value: string) {
+    setEstimate((prev) => (prev ? { ...prev, unitquantity: parseFloat(value) || 0 } : prev));
+  }
+
   async function handleSave() {
     if (!estimate) return;
     setSaving(true);
@@ -98,6 +102,18 @@ export default function EstimateFoodForm({ foodName, onSaved, externalMatch }: P
           ? 'Found in an external food database — review and edit before saving:'
           : 'AI-suggested values — review and edit before saving:'}
       </Text>
+      <View style={styles.fieldRow}>
+        <Text style={styles.fieldLabel}>Values are per</Text>
+        <View style={styles.basisRow}>
+          <TextInput
+            style={[styles.fieldInput, styles.basisQuantityInput]}
+            keyboardType="numeric"
+            value={String(estimate.unitquantity)}
+            onChangeText={updateUnitQuantity}
+          />
+          <Text style={styles.basisUnitText}>{estimate.unit}</Text>
+        </View>
+      </View>
       {FIELDS.map((f) => (
         <View key={f.key} style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>{f.label}</Text>
@@ -134,6 +150,9 @@ const styles = StyleSheet.create({
     minWidth: 70,
     textAlign: 'right',
   },
+  basisRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  basisQuantityInput: { minWidth: 50 },
+  basisUnitText: { fontFamily: fonts.body, fontSize: 13, color: colors.text },
   button: {
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
