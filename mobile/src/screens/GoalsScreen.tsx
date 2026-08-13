@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
-import { MACROS, trackedMacroDefs } from '../macros';
+import { MACROS } from '../macros';
 import { colors, fonts, radius } from '../theme';
 import type { Goals, TrackedMacro } from '../types/api';
 
@@ -74,20 +74,6 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
         {goals && (
           <>
-            <Text style={styles.kicker}>Tracked macros</Text>
-            <View style={{ gap: 4, marginBottom: 22 }}>
-              {MACROS.map((m) => (
-                <View key={m.key} style={styles.toggleRow}>
-                  <Text style={styles.toggleLabel}>{m.label.charAt(0) + m.label.slice(1).toLowerCase()}</Text>
-                  <Switch
-                    value={goals.tracked_macros.includes(m.key)}
-                    onValueChange={() => toggleMacro(m.key)}
-                    trackColor={{ true: colors.accent }}
-                  />
-                </View>
-              ))}
-            </View>
-
             <Text style={styles.kicker}>Daily targets and limits</Text>
             <View style={{ gap: 12, marginBottom: 22 }}>
               <View style={styles.field}>
@@ -105,28 +91,38 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
                   </Pressable>
                 </View>
               </View>
-              {trackedMacroDefs(goals.tracked_macros).map((m) => (
-                <View key={m.key} style={styles.field}>
-                  <Text style={styles.fieldLabel}>
-                    {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
-                  </Text>
-                  <View style={styles.stepperRow}>
-                    <Pressable
-                      style={styles.stepperButton}
-                      onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
-                    >
-                      <Text style={styles.stepperButtonText}>−</Text>
-                    </Pressable>
-                    <Text style={styles.stepperValue}>{goals[m.goalKey]}</Text>
-                    <Pressable
-                      style={[styles.stepperButton, styles.stepperButtonPrimary]}
-                      onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
-                    >
-                      <Text style={[styles.stepperButtonText, { color: colors.bg }]}>+</Text>
-                    </Pressable>
+              {MACROS.map((m) => {
+                const on = goals.tracked_macros.includes(m.key);
+                return (
+                  <View key={m.key} style={styles.field}>
+                    <Text style={styles.fieldLabel}>
+                      {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
+                    </Text>
+                    <View style={styles.stepperRow}>
+                      <Pressable
+                        style={[styles.stepperButton, !on && styles.stepperButtonDisabled]}
+                        disabled={!on}
+                        onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
+                      >
+                        <Text style={[styles.stepperButtonText, !on && styles.stepperButtonTextDisabled]}>−</Text>
+                      </Pressable>
+                      <Text style={[styles.stepperValue, !on && styles.stepperValueDisabled]}>{goals[m.goalKey]}</Text>
+                      <Pressable
+                        style={[styles.stepperButton, styles.stepperButtonPrimary, !on && styles.stepperButtonDisabled]}
+                        disabled={!on}
+                        onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
+                      >
+                        <Text style={[styles.stepperButtonText, { color: colors.bg }, !on && styles.stepperButtonTextDisabled]}>+</Text>
+                      </Pressable>
+                      <Switch
+                        value={on}
+                        onValueChange={() => toggleMacro(m.key)}
+                        trackColor={{ true: colors.accent }}
+                      />
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {saving && <ActivityIndicator color={colors.accent700} style={{ marginBottom: 8 }} />}
@@ -173,7 +169,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepperButtonPrimary: { backgroundColor: colors.accent },
+  stepperButtonDisabled: { backgroundColor: colors.neutral100, opacity: 0.4 },
   stepperButtonText: { fontFamily: fonts.heading, fontSize: 19, color: colors.text },
+  stepperButtonTextDisabled: { opacity: 0.4 },
   stepperValue: { flex: 1, textAlign: 'center', fontFamily: fonts.heading, fontSize: 28, color: colors.text },
+  stepperValueDisabled: { opacity: 0.4 },
   accountEmail: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.5, marginTop: 20, textAlign: 'center' },
 });
