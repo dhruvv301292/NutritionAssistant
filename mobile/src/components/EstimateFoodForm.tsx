@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { createFood, estimateFood } from '../api/client';
+import { estimateFood } from '../api/client';
 import { colors, fonts, radius } from '../theme';
 import type { Food, NutritionEstimate } from '../types/api';
 
@@ -12,10 +12,15 @@ export function needsEstimate(error: string | undefined): boolean {
 
 type Props = {
   foodName: string;
-  onSaved: () => void;
+  // Controlled by the parent (LogMealSheet) rather than owned here, so
+  // "log this meal" can save whatever's currently in the form — including
+  // unsaved edits — for every pending item in one pass, instead of
+  // requiring a separate "save & add to database" tap per item first.
+  estimate: NutritionEstimate | null;
+  onEstimateChange: (estimate: NutritionEstimate) => void;
   // When set, this is an unconfirmed match from an external food database
-  // (USDA/FatSecret) rather than a total miss — pre-fills the edit form
-  // instead of requiring a separate "suggest values with AI" step.
+  // rather than a total miss — pre-fills the edit form instead of
+  // requiring a separate "suggest values with AI" step.
   externalMatch?: Food;
 };
 
@@ -43,17 +48,25 @@ function toEstimate(food: Food): NutritionEstimate {
   };
 }
 
-export default function EstimateFoodForm({ foodName, onSaved, externalMatch }: Props) {
-  const [estimate, setEstimate] = useState<NutritionEstimate | null>(externalMatch ? toEstimate(externalMatch) : null);
+export default function EstimateFoodForm({ foodName, estimate, onEstimateChange, externalMatch }: Props) {
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // externalMatch arrives already resolved (from the chat response), so
+  // seed the parent's estimate state with it as soon as this item shows up
+  // — no separate fetch needed for that path.
+  useEffect(() => {
+    if (externalMatch && !estimate) {
+      onEstimateChange(toEstimate(externalMatch));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalMatch]);
 
   async function handleEstimate() {
     setLoading(true);
     setError(null);
     try {
-      setEstimate(await estimateFood(foodName));
+      onEstimateChange(await estimateFood(foodName));
     } catch {
       setError('Could not get an estimate.');
     } finally {
@@ -62,25 +75,13 @@ export default function EstimateFoodForm({ foodName, onSaved, externalMatch }: P
   }
 
   function updateField(key: FieldKey, value: string) {
-    setEstimate((prev) => (prev ? { ...prev, [key]: parseFloat(value) || 0 } : prev));
+    if (!estimate) return;
+    onEstimateChange({ ...estimate, [key]: parseFloat(value) || 0 });
   }
 
   function updateUnitQuantity(value: string) {
-    setEstimate((prev) => (prev ? { ...prev, unitquantity: parseFloat(value) || 0 } : prev));
-  }
-
-  async function handleSave() {
     if (!estimate) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await createFood(estimate);
-      onSaved();
-    } catch {
-      setError('Could not save this food.');
-    } finally {
-      setSaving(false);
-    }
+    onEstimateChange({ ...estimate, unitquantity: parseFloat(value) || 0 });
   }
 
   if (!estimate) {
@@ -125,9 +126,6 @@ export default function EstimateFoodForm({ foodName, onSaved, externalMatch }: P
           />
         </View>
       ))}
-      <Pressable style={styles.button} onPress={handleSave} disabled={saving}>
-        {saving ? <ActivityIndicator color={colors.bg} /> : <Text style={styles.buttonText}>save & add to database</Text>}
-      </Pressable>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );

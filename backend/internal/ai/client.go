@@ -56,8 +56,10 @@ func (c *Client) ParseMeal(ctx context.Context, text string) (ParsedMeal, error)
 	// window (default 5 min) instead of on every request.
 	tool.OfTool.CacheControl = anthropic.NewCacheControlEphemeralParam()
 
+	// Haiku, not Sonnet: this is constrained extraction against a forced
+	// tool schema, not open-ended reasoning — cheaper model, same task.
 	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:      anthropic.ModelClaudeSonnet4_5,
+		Model:      anthropic.ModelClaudeHaiku4_5,
 		MaxTokens:  1024,
 		ToolChoice: anthropic.ToolChoiceParamOfTool(parseMealToolName),
 		Tools:      []anthropic.ToolUnionParam{tool},
@@ -198,8 +200,10 @@ func (c *Client) VerifyBrandMatch(ctx context.Context, queryBrand, queryProduct,
 		queryProduct, queryBrand, candidateName, candidateBrand,
 	)
 
+	// Haiku, not Sonnet: a forced-schema yes/no verdict on a specific
+	// pairing, not open-ended reasoning.
 	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:      anthropic.ModelClaudeSonnet4_5,
+		Model:      anthropic.ModelClaudeHaiku4_5,
 		MaxTokens:  256,
 		ToolChoice: anthropic.ToolChoiceParamOfTool(verifyBrandMatchToolName),
 		Tools:      []anthropic.ToolUnionParam{tool},

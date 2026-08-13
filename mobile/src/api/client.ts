@@ -1,5 +1,5 @@
 import { getStoredToken } from '../auth/tokenStorage';
-import type { ChatMealResponse, DailySummary, Goals, MealLog, NutritionEstimate, Slot, User } from '../types/api';
+import type { ChatMealResponse, DailySummary, Food, Goals, MealLog, NutritionEstimate, Slot, User } from '../types/api';
 
 // Defaults to the deployed backend so the app works without any local setup.
 // For local backend development, set EXPO_PUBLIC_API_BASE_URL to your
@@ -79,6 +79,6 @@ export function estimateFood(name: string): Promise<NutritionEstimate> {
   return request('/foods/estimate', { method: 'POST', body: JSON.stringify({ name }) });
 }
 
-export function createFood(estimate: NutritionEstimate): Promise<unknown> {
+export function createFood(estimate: NutritionEstimate): Promise<Food> {
   return request('/foods', { method: 'POST', body: JSON.stringify(estimate) });
 }

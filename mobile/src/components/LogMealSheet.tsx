@@ -16,16 +16,29 @@ import {
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 import { Feather } from '@expo/vector-icons';
-import { chatMeal, saveMeal } from '../api/client';
+import { chatMeal, createFood, saveMeal } from '../api/client';
 import { colors, fonts, radius, shadow } from '../theme';
 import { SLOT_LABEL, SLOT_ORDER, suggestedSlot } from '../slots';
-import type { ChatMealResponse, Slot } from '../types/api';
+import type { ChatMealResponse, NutritionEstimate, Slot } from '../types/api';
 import NutritionTags from './NutritionTags';
 import EstimateFoodForm, { needsEstimate } from './EstimateFoodForm';
 
+function titleCase(s: string): string {
+  return s.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1));
+}
+
 type ChatEntry =
   | { role: 'user'; text: string }
-  | { role: 'assistant'; response: ChatMealResponse; saved: boolean; sourceText: string }
+  | {
+      role: 'assistant';
+      response: ChatMealResponse;
+      saved: boolean;
+      saving: boolean;
+      // Pending edits for items needing an estimate/review, keyed by item
+      // index — lets "log this meal" save whatever's currently in each
+      // form without a separate per-item save step.
+      estimates: Record<number, NutritionEstimate>;
+    }
   | { role: 'error'; text: string };
 
 type Props = {
@@ -63,15 +76,18 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
     ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false });
   }
 
-  async function sendText(text: string, { echoAsUserMessage }: { echoAsUserMessage: boolean }) {
+  async function handleSend() {
+    const text = input.trim();
     if (!text || sending) return;
-    if (echoAsUserMessage) {
-      setEntries((prev) => [...prev, { role: 'user', text }]);
-    }
+    setInput('');
+    setEntries((prev) => [...prev, { role: 'user', text }]);
     setSending(true);
     try {
       const response = await chatMeal(text);
-      setEntries((prev) => [...prev, { role: 'assistant', response, saved: false, sourceText: text }]);
+      setEntries((prev) => [
+        ...prev,
+        { role: 'assistant', response, saved: false, saving: false, estimates: {} },
+      ]);
     } catch {
       setEntries((prev) => [...prev, { role: 'error', text: 'Could not reach the server.' }]);
     } finally {
@@ -79,25 +95,40 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
     }
   }
 
-  async function handleSend() {
-    const text = input.trim();
-    setInput('');
-    await sendText(text, { echoAsUserMessage: true });
+  function setEntrySaving(index: number, saving: boolean) {
+    setEntries((prev) =>
+      prev.map((e, i) => (i === index && e.role === 'assistant' ? { ...e, saving } : e))
+    );
   }
 
-  // After the user saves a food via the AI-estimate flow, re-run the same
-  // original message so the newly-saved food resolves this time — mirrors
-  // ChatMeal.tsx's web behavior.
-  async function handleRetry(sourceText: string) {
-    await sendText(sourceText, { echoAsUserMessage: false });
-  }
-
-  async function handleLogMeal(index: number, response: ChatMealResponse) {
-    const items = response.result.items
-      .filter((item) => item.matched_food && !item.ambiguous && !item.error)
-      .map((item) => ({ food_name: item.matched_food!.name, quantity: item.quantity, unit: item.unit }));
-    if (items.length === 0) return;
+  // Logging a meal now also confirms and persists any pending
+  // (unconfirmed/estimated) items in the same action — no separate "save &
+  // add to database" tap required first. Each pending item's current form
+  // values (estimates[j], including any edits) are saved via createFood,
+  // and the newly-created food's name is what actually gets logged.
+  async function handleLogMeal(index: number, entry: Extract<ChatEntry, { role: 'assistant' }>) {
+    const { response, estimates } = entry;
+    setEntrySaving(index, true);
     try {
+      const items: { food_name: string; quantity: number; unit: string }[] = [];
+      for (let j = 0; j < response.result.items.length; j++) {
+        const item = response.result.items[j];
+        if (item.matched_food) {
+          if (item.ambiguous) continue;
+          items.push({ food_name: item.matched_food.name, quantity: item.quantity, unit: item.unit });
+          continue;
+        }
+        const pending = estimates[j];
+        if (pending) {
+          const created = await createFood(pending);
+          items.push({ food_name: created.name, quantity: item.quantity, unit: item.unit });
+        }
+        // Items with neither a matched_food nor a pending estimate (still
+        // ambiguous, or a hard error with no estimate form shown) are
+        // silently skipped, same as before.
+      }
+      if (items.length === 0) return;
+
       await saveMeal(items, slot);
       setEntries((prev) =>
         prev.map((e, i) => (i === index && e.role === 'assistant' ? { ...e, saved: true } : e))
@@ -105,7 +136,19 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
       onMealSaved();
     } catch {
       setEntries((prev) => [...prev, { role: 'error', text: 'Could not save the meal.' }]);
+    } finally {
+      setEntrySaving(index, false);
     }
+  }
+
+  function setItemEstimate(entryIndex: number, itemIndex: number, estimate: NutritionEstimate) {
+    setEntries((prev) =>
+      prev.map((e, i) =>
+        i === entryIndex && e.role === 'assistant'
+          ? { ...e, estimates: { ...e.estimates, [itemIndex]: estimate } }
+          : e
+      )
+    );
   }
 
   function handleClose() {
@@ -168,7 +211,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
                 </View>
               );
             }
-            const { response, saved, sourceText } = entry;
+            const { response, saved, saving, estimates } = entry;
             return (
               <View key={i} style={[styles.bubble, styles.assistantBubble, { maxWidth: '100%' }]}>
                 <Text style={styles.assistantIntro}>
@@ -176,19 +219,24 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
                     ? 'I need a bit more info on some of these — resolved items can still be logged:'
                     : "Here's what I found:"}
                 </Text>
-                <View style={{ gap: 8, marginTop: 8 }}>
+                <View style={{ gap: 16, marginTop: 8 }}>
                   {response.result.items.map((item, j) => (
                     <View key={j} style={styles.itemRow}>
-                      <Text style={styles.itemName}>{item.matched_food?.name ?? item.food_name}</Text>
+                      <Text style={styles.itemName}>{item.matched_food?.name ?? titleCase(item.food_name)}</Text>
                       {item.unconfirmed_food && (
                         <EstimateFoodForm
                           foodName={item.food_name}
-                          onSaved={() => handleRetry(sourceText)}
+                          estimate={estimates[j] ?? null}
+                          onEstimateChange={(e) => setItemEstimate(i, j, e)}
                           externalMatch={item.unconfirmed_food}
                         />
                       )}
                       {!item.unconfirmed_food && item.error && needsEstimate(item.error) && (
-                        <EstimateFoodForm foodName={item.food_name} onSaved={() => handleRetry(sourceText)} />
+                        <EstimateFoodForm
+                          foodName={item.food_name}
+                          estimate={estimates[j] ?? null}
+                          onEstimateChange={(e) => setItemEstimate(i, j, e)}
+                        />
                       )}
                       {!item.unconfirmed_food && item.error && !needsEstimate(item.error) && (
                         <Text style={styles.errorText}>{item.error}</Text>
@@ -209,8 +257,16 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
                 {saved ? (
                   <Text style={styles.savedText}>meal logged</Text>
                 ) : (
-                  <Pressable style={styles.logButton} onPress={() => handleLogMeal(i, response)}>
-                    <Text style={styles.logButtonText}>log this meal</Text>
+                  <Pressable
+                    style={[styles.logButton, saving && { opacity: 0.6 }]}
+                    onPress={() => handleLogMeal(i, entry)}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color={colors.bg} />
+                    ) : (
+                      <Text style={styles.logButtonText}>log this meal</Text>
+                    )}
                   </Pressable>
                 )}
               </View>
