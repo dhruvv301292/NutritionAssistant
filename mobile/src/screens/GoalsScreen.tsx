@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
+import SwipeableGoalRow from '../components/SwipeableGoalRow';
 import { MACROS } from '../macros';
 import { colors, fonts, radius } from '../theme';
 import type { Goals, TrackedMacro } from '../types/api';
@@ -94,33 +95,39 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
               {MACROS.map((m) => {
                 const on = goals.tracked_macros.includes(m.key);
                 return (
-                  <View key={m.key} style={styles.field}>
-                    <Text style={styles.fieldLabel}>
-                      {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
-                    </Text>
-                    <View style={styles.stepperRow}>
-                      <Pressable
-                        style={[styles.stepperButton, !on && styles.stepperButtonDisabled]}
-                        disabled={!on}
-                        onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
-                      >
-                        <Text style={[styles.stepperButtonText, !on && styles.stepperButtonTextDisabled]}>−</Text>
-                      </Pressable>
-                      <Text style={[styles.stepperValue, !on && styles.stepperValueDisabled]}>{goals[m.goalKey]}</Text>
-                      <Pressable
-                        style={[styles.stepperButton, styles.stepperButtonPrimary, !on && styles.stepperButtonDisabled]}
-                        disabled={!on}
-                        onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
-                      >
-                        <Text style={[styles.stepperButtonText, { color: colors.bg }, !on && styles.stepperButtonTextDisabled]}>+</Text>
-                      </Pressable>
+                  <SwipeableGoalRow
+                    key={m.key}
+                    toggle={
                       <Switch
                         value={on}
                         onValueChange={() => toggleMacro(m.key)}
                         trackColor={{ true: colors.accent }}
                       />
+                    }
+                  >
+                    <View style={styles.field}>
+                      <Text style={styles.fieldLabel}>
+                        {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
+                      </Text>
+                      <View style={styles.stepperRow}>
+                        <Pressable
+                          style={[styles.stepperButton, !on && styles.stepperButtonDisabled]}
+                          disabled={!on}
+                          onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
+                        >
+                          <Text style={[styles.stepperButtonText, !on && styles.stepperButtonTextDisabled]}>−</Text>
+                        </Pressable>
+                        <Text style={[styles.stepperValue, !on && styles.stepperValueDisabled]}>{goals[m.goalKey]}</Text>
+                        <Pressable
+                          style={[styles.stepperButton, styles.stepperButtonPrimary, !on && styles.stepperButtonDisabled]}
+                          disabled={!on}
+                          onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
+                        >
+                          <Text style={[styles.stepperButtonText, { color: colors.bg }, !on && styles.stepperButtonTextDisabled]}>+</Text>
+                        </Pressable>
+                      </View>
                     </View>
-                  </View>
+                  </SwipeableGoalRow>
                 );
               })}
             </View>
