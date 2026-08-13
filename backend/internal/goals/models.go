@@ -22,11 +22,13 @@ type Goals struct {
 	CarbGoal      int      `json:"carb_goal"`
 	FatGoal       int      `json:"fat_goal"`
 	FiberGoal     int      `json:"fiber_goal"`
+	SodiumGoal    int      `json:"sodium_goal"`
 	TrackedMacros []string `json:"tracked_macros"`
 }
 
 // Defaults mirror the mockup's initial targets so a first-time user sees
-// sensible numbers before ever setting their own.
+// sensible numbers before ever setting their own. SodiumGoal defaults to
+// the AHA's stricter recommended limit.
 func Defaults(userID int) Goals {
 	return Goals{
 		UserID:        userID,
@@ -35,6 +37,7 @@ func Defaults(userID int) Goals {
 		CarbGoal:      250,
 		FatGoal:       70,
 		FiberGoal:     30,
+		SodiumGoal:    1800,
 		TrackedMacros: DefaultTrackedMacros,
 	}
 }

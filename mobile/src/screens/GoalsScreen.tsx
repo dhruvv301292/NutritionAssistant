@@ -4,17 +4,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
-import { MACROS } from '../macros';
+import { MACROS, trackedMacroDefs } from '../macros';
 import { colors, fonts, radius } from '../theme';
 import type { Goals, TrackedMacro } from '../types/api';
 
-type FieldKey = 'calorie_goal' | 'protein_goal' | 'fiber_goal';
+type NumericGoalKey = 'calorie_goal' | 'protein_goal' | 'carb_goal' | 'fat_goal' | 'fiber_goal' | 'sodium_goal';
 
-const FIELDS: { key: FieldKey; label: string; step: number }[] = [
-  { key: 'calorie_goal', label: 'Calories (kcal)', step: 100 },
-  { key: 'protein_goal', label: 'Protein (g)', step: 10 },
-  { key: 'fiber_goal', label: 'Fiber (g)', step: 5 },
-];
+const STEP: Record<NumericGoalKey, number> = {
+  calorie_goal: 100,
+  protein_goal: 10,
+  carb_goal: 10,
+  fat_goal: 5,
+  fiber_goal: 5,
+  sodium_goal: 100,
+};
 
 export default function GoalsScreen({ focused }: { focused: boolean }) {
   const { state } = useAuth();
@@ -45,7 +48,7 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
     }
   }
 
-  function adjust(key: FieldKey, delta: number) {
+  function adjust(key: NumericGoalKey, delta: number) {
     if (!goals) return;
     persist({ ...goals, [key]: Math.max(0, goals[key] + delta) });
   }
@@ -71,27 +74,6 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
         {goals && (
           <>
-            <Text style={styles.kicker}>Daily targets</Text>
-            <View style={{ gap: 12, marginBottom: 22 }}>
-              {FIELDS.map((f) => (
-                <View key={f.key} style={styles.field}>
-                  <Text style={styles.fieldLabel}>{f.label}</Text>
-                  <View style={styles.stepperRow}>
-                    <Pressable style={styles.stepperButton} onPress={() => adjust(f.key, -f.step)}>
-                      <Text style={styles.stepperButtonText}>−</Text>
-                    </Pressable>
-                    <Text style={styles.stepperValue}>{goals[f.key]}</Text>
-                    <Pressable
-                      style={[styles.stepperButton, styles.stepperButtonPrimary]}
-                      onPress={() => adjust(f.key, f.step)}
-                    >
-                      <Text style={[styles.stepperButtonText, { color: colors.bg }]}>+</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-            </View>
-
             <Text style={styles.kicker}>Tracked macros</Text>
             <View style={{ gap: 4, marginBottom: 22 }}>
               {MACROS.map((m) => (
@@ -102,6 +84,47 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
                     onValueChange={() => toggleMacro(m.key)}
                     trackColor={{ true: colors.accent }}
                   />
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.kicker}>Daily targets and limits</Text>
+            <View style={{ gap: 12, marginBottom: 22 }}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Calories (kcal)</Text>
+                <View style={styles.stepperRow}>
+                  <Pressable style={styles.stepperButton} onPress={() => adjust('calorie_goal', -STEP.calorie_goal)}>
+                    <Text style={styles.stepperButtonText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValue}>{goals.calorie_goal}</Text>
+                  <Pressable
+                    style={[styles.stepperButton, styles.stepperButtonPrimary]}
+                    onPress={() => adjust('calorie_goal', STEP.calorie_goal)}
+                  >
+                    <Text style={[styles.stepperButtonText, { color: colors.bg }]}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {trackedMacroDefs(goals.tracked_macros).map((m) => (
+                <View key={m.key} style={styles.field}>
+                  <Text style={styles.fieldLabel}>
+                    {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
+                  </Text>
+                  <View style={styles.stepperRow}>
+                    <Pressable
+                      style={styles.stepperButton}
+                      onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
+                    >
+                      <Text style={styles.stepperButtonText}>−</Text>
+                    </Pressable>
+                    <Text style={styles.stepperValue}>{goals[m.goalKey]}</Text>
+                    <Pressable
+                      style={[styles.stepperButton, styles.stepperButtonPrimary]}
+                      onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
+                    >
+                      <Text style={[styles.stepperButtonText, { color: colors.bg }]}>+</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </View>

@@ -88,6 +88,7 @@ export type Goals = {
   carb_goal: number;
   fat_goal: number;
   fiber_goal: number;
+  sodium_goal: number;
   tracked_macros: TrackedMacro[];
 };
 
