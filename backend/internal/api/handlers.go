@@ -453,6 +453,12 @@ func (h *Handler) PutGoals(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	for _, m := range g.TrackedMacros {
+		if !goals.ValidTrackedMacros[m] {
+			http.Error(w, "invalid tracked_macros value: "+m, http.StatusBadRequest)
+			return
+		}
+	}
 	g.UserID = userID
 	saved, err := h.goalsRepo.Upsert(r.Context(), g)
 	if err != nil {

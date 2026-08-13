@@ -8,6 +8,7 @@ import CaloriesCard from '../components/CaloriesCard';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
 import NutritionTags from '../components/NutritionTags';
+import { MacroDef, macroGoal, trackedMacroDefs } from '../macros';
 import { colors, fonts, radius, shadow } from '../theme';
 import { dateKey, formatTime, startOfWeek, weekDates } from '../dateUtils';
 import { SLOT_LABEL, SLOT_ORDER } from '../slots';
@@ -15,13 +16,6 @@ import type { DailySummary, Goals, MealLog, Nutrition } from '../types/api';
 
 const WEEKDAY_LABELS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const WEEK_PAGER_CENTER = 1;
-
-const MACRO_TILES: { key: keyof Nutrition; label: string; color: string; goalKey: keyof Goals }[] = [
-  { key: 'protein', label: 'PROTEIN', color: colors.accent700, goalKey: 'protein_goal' },
-  { key: 'carbs', label: 'CARBS', color: colors.accent2_500, goalKey: 'carb_goal' },
-  { key: 'fat', label: 'FAT', color: colors.neutral700, goalKey: 'fat_goal' },
-  { key: 'fiber', label: 'FIBER', color: colors.accent2_700, goalKey: 'fiber_goal' },
-];
 
 export default function HistoryScreen({ focused }: { focused: boolean }) {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -33,7 +27,7 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMacro, setActiveMacro] = useState<(typeof MACRO_TILES)[number] | null>(null);
+  const [activeMacro, setActiveMacro] = useState<MacroDef | null>(null);
   const weekPagerRef = useRef<PagerView>(null);
 
   const load = useCallback((date: string) => {
@@ -140,25 +134,14 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
         {summary && goals && (
           <>
             <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
-            <View style={styles.tileGrid}>
-              {MACRO_TILES.slice(0, 2).map((m) => (
-                <MacroTile
-                  key={m.key}
-                  label={m.label}
-                  value={Math.round(summary.total[m.key])}
-                  goal={goals[m.goalKey]}
-                  color={m.color}
-                  onPress={() => setActiveMacro(m)}
-                />
-              ))}
-            </View>
             <View style={[styles.tileGrid, { marginBottom: 18 }]}>
-              {MACRO_TILES.slice(2, 4).map((m) => (
+              {trackedMacroDefs(goals.tracked_macros).map((m) => (
                 <MacroTile
                   key={m.key}
                   label={m.label}
                   value={Math.round(summary.total[m.key])}
-                  goal={goals[m.goalKey]}
+                  goal={macroGoal(m, goals)}
+                  unit={m.unit}
                   color={m.color}
                   onPress={() => setActiveMacro(m)}
                 />
@@ -179,7 +162,7 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
                       </Text>
                       <Text style={styles.mealTime}>{formatTime(meal.logged_at)}</Text>
                     </View>
-                    <NutritionTags nutrition={sumMealNutrition(meal)} />
+                    <NutritionTags nutrition={sumMealNutrition(meal)} trackedMacros={goals.tracked_macros} />
                   </View>
                 ))}
               </View>
@@ -194,7 +177,7 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
           onClose={() => setActiveMacro(null)}
           label={activeMacro.label}
           macroKey={activeMacro.key}
-          unit="g"
+          unit={activeMacro.unit}
           total={summary.total[activeMacro.key]}
           color={activeMacro.color}
           meals={summary.meals}
@@ -248,7 +231,7 @@ const styles = StyleSheet.create({
   dateNumDisabled: { color: colors.neutral500 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
   kicker: { fontFamily: fonts.bodySemiBold, fontSize: 10, letterSpacing: 1, color: colors.accent, marginBottom: 8, textTransform: 'uppercase' },
-  tileGrid: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14 },
   emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.5 },
   mealCard: { backgroundColor: colors.surface, borderRadius: 26, padding: 14, marginBottom: 10, gap: 8 },

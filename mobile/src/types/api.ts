@@ -78,6 +78,8 @@ export type DailySummary = {
   meals: MealLog[];
 };
 
+export type TrackedMacro = 'protein' | 'carbs' | 'fat' | 'fiber' | 'sodium';
+
 export type Goals = {
   user_id: number;
   calorie_goal: number;
@@ -85,6 +87,7 @@ export type Goals = {
   carb_goal: number;
   fat_goal: number;
   fiber_goal: number;
+  tracked_macros: TrackedMacro[];
 };
 
 export type NutritionEstimate = {

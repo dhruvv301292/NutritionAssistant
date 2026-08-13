@@ -132,7 +132,7 @@ export default function EstimateFoodForm({ foodName, estimate, onEstimateChange,
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 8, marginTop: 4 },
+  container: { gap: 8 },
   warningText: { fontFamily: fonts.body, fontSize: 12, color: '#d68910' },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0392b' },
   fieldRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

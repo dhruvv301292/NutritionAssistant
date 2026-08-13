@@ -19,7 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import { chatMeal, createFood, saveMeal } from '../api/client';
 import { colors, fonts, radius, shadow } from '../theme';
 import { SLOT_LABEL, SLOT_ORDER, suggestedSlot } from '../slots';
-import type { ChatMealResponse, NutritionEstimate, Slot } from '../types/api';
+import type { ChatMealResponse, NutritionEstimate, Slot, TrackedMacro } from '../types/api';
 import NutritionTags from './NutritionTags';
 import EstimateFoodForm, { needsEstimate } from './EstimateFoodForm';
 
@@ -45,12 +45,13 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onMealSaved: () => void;
+  trackedMacros: TrackedMacro[];
 };
 
 const MIN_INPUT_HEIGHT = 40;
 const MAX_INPUT_HEIGHT = 110;
 
-export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
+export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMacros }: Props) {
   const [input, setInput] = useState('');
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [sending, setSending] = useState(false);
@@ -224,19 +225,23 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
                     <View key={j} style={styles.itemRow}>
                       <Text style={styles.itemName}>{item.matched_food?.name ?? titleCase(item.food_name)}</Text>
                       {item.unconfirmed_food && (
-                        <EstimateFoodForm
-                          foodName={item.food_name}
-                          estimate={estimates[j] ?? null}
-                          onEstimateChange={(e) => setItemEstimate(i, j, e)}
-                          externalMatch={item.unconfirmed_food}
-                        />
+                        <View style={styles.estimateCard}>
+                          <EstimateFoodForm
+                            foodName={item.food_name}
+                            estimate={estimates[j] ?? null}
+                            onEstimateChange={(e) => setItemEstimate(i, j, e)}
+                            externalMatch={item.unconfirmed_food}
+                          />
+                        </View>
                       )}
                       {!item.unconfirmed_food && item.error && needsEstimate(item.error) && (
-                        <EstimateFoodForm
-                          foodName={item.food_name}
-                          estimate={estimates[j] ?? null}
-                          onEstimateChange={(e) => setItemEstimate(i, j, e)}
-                        />
+                        <View style={styles.estimateCard}>
+                          <EstimateFoodForm
+                            foodName={item.food_name}
+                            estimate={estimates[j] ?? null}
+                            onEstimateChange={(e) => setItemEstimate(i, j, e)}
+                          />
+                        </View>
                       )}
                       {!item.unconfirmed_food && item.error && !needsEstimate(item.error) && (
                         <Text style={styles.errorText}>{item.error}</Text>
@@ -246,7 +251,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved }: Props) {
                           did you mean: {item.candidates?.map((c) => c.name).join(', ')}?
                         </Text>
                       )}
-                      {item.nutrition && <NutritionTags nutrition={item.nutrition} />}
+                      {item.nutrition && <NutritionTags nutrition={item.nutrition} trackedMacros={trackedMacros} />}
                     </View>
                   ))}
                 </View>
@@ -345,6 +350,14 @@ const styles = StyleSheet.create({
   assistantBubble: { alignSelf: 'flex-start', backgroundColor: colors.neutral200 },
   assistantIntro: { fontFamily: fonts.body, fontSize: 14, color: colors.text },
   itemRow: { gap: 4 },
+  estimateCard: {
+    backgroundColor: colors.neutral100,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    padding: 10,
+    marginTop: 2,
+  },
   itemName: { fontFamily: fonts.heading, fontSize: 14, color: colors.text },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0392b' },
   warningText: { fontFamily: fonts.body, fontSize: 12, color: '#d68910' },

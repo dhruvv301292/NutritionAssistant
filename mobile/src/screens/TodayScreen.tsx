@@ -8,23 +8,17 @@ import CaloriesCard from '../components/CaloriesCard';
 import LogMealSheet from '../components/LogMealSheet';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
+import { MacroDef, macroGoal, trackedMacroDefs } from '../macros';
 import { colors, fonts, radius, shadow } from '../theme';
 import { dateKey, formatDateLabel } from '../dateUtils';
-import type { DailySummary, Goals, Nutrition } from '../types/api';
-
-const MACRO_TILES: { key: keyof Nutrition; label: string; color: string; goalKey: keyof Goals }[] = [
-  { key: 'protein', label: 'PROTEIN', color: colors.accent700, goalKey: 'protein_goal' },
-  { key: 'carbs', label: 'CARBS', color: colors.accent2_500, goalKey: 'carb_goal' },
-  { key: 'fat', label: 'FAT', color: colors.neutral700, goalKey: 'fat_goal' },
-  { key: 'fiber', label: 'FIBER', color: colors.accent2_700, goalKey: 'fiber_goal' },
-];
+import type { DailySummary, Goals } from '../types/api';
 
 export default function TodayScreen({ focused }: { focused: boolean }) {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeMacro, setActiveMacro] = useState<(typeof MACRO_TILES)[number] | null>(null);
+  const [activeMacro, setActiveMacro] = useState<MacroDef | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -58,24 +52,13 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
           <>
             <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
             <View style={styles.tileGrid}>
-              {MACRO_TILES.slice(0, 2).map((m) => (
+              {trackedMacroDefs(goals.tracked_macros).map((m) => (
                 <MacroTile
                   key={m.key}
                   label={m.label}
                   value={Math.round(summary.total[m.key])}
-                  goal={goals[m.goalKey]}
-                  color={m.color}
-                  onPress={() => setActiveMacro(m)}
-                />
-              ))}
-            </View>
-            <View style={styles.tileGrid}>
-              {MACRO_TILES.slice(2, 4).map((m) => (
-                <MacroTile
-                  key={m.key}
-                  label={m.label}
-                  value={Math.round(summary.total[m.key])}
-                  goal={goals[m.goalKey]}
+                  goal={macroGoal(m, goals)}
+                  unit={m.unit}
                   color={m.color}
                   onPress={() => setActiveMacro(m)}
                 />
@@ -92,7 +75,12 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
         <Text style={styles.promptText}>Ready to log a meal?</Text>
       </Pressable>
 
-      <LogMealSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onMealSaved={load} />
+      <LogMealSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onMealSaved={load}
+        trackedMacros={goals?.tracked_macros ?? []}
+      />
 
       {summary && activeMacro && (
         <MacroBreakdownSheet
@@ -100,7 +88,7 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
           onClose={() => setActiveMacro(null)}
           label={activeMacro.label}
           macroKey={activeMacro.key}
-          unit="g"
+          unit={activeMacro.unit}
           total={summary.total[activeMacro.key]}
           color={activeMacro.color}
           meals={summary.meals}
@@ -123,7 +111,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   dateLabel: { fontFamily: fonts.body, fontSize: 12.5, color: colors.accent700, marginTop: 2 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 8, gap: 12 },
-  tileGrid: { flexDirection: 'row', gap: 12 },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14 },
   promptBar: {
     flexDirection: 'row',

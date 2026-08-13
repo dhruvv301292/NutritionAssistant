@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
+import { MACROS } from '../macros';
 import { colors, fonts, radius, shadow } from '../theme';
-import type { Goals } from '../types/api';
+import type { Goals, TrackedMacro } from '../types/api';
 
 type FieldKey = 'calorie_goal' | 'protein_goal' | 'fiber_goal';
 
@@ -32,6 +33,16 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
   function adjust(key: FieldKey, delta: number) {
     setGoals((prev) => (prev ? { ...prev, [key]: Math.max(0, prev[key] + delta) } : prev));
+  }
+
+  function toggleMacro(key: TrackedMacro) {
+    setGoals((prev) => {
+      if (!prev) return prev;
+      const tracked = prev.tracked_macros.includes(key)
+        ? prev.tracked_macros.filter((m) => m !== key)
+        : [...prev.tracked_macros, key];
+      return { ...prev, tracked_macros: tracked };
+    });
   }
 
   async function handleSave() {
@@ -81,6 +92,20 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
               ))}
             </View>
 
+            <Text style={styles.kicker}>Tracked macros</Text>
+            <View style={{ gap: 4, marginBottom: 22 }}>
+              {MACROS.map((m) => (
+                <View key={m.key} style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>{m.label.charAt(0) + m.label.slice(1).toLowerCase()}</Text>
+                  <Switch
+                    value={goals.tracked_macros.includes(m.key)}
+                    onValueChange={() => toggleMacro(m.key)}
+                    trackColor={{ true: colors.accent }}
+                  />
+                </View>
+              ))}
+            </View>
+
             <Pressable style={[styles.saveButton, shadow.sm]} onPress={handleSave} disabled={saving}>
               <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save goals'}</Text>
             </Pressable>
@@ -109,6 +134,13 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 14, fontFamily: fonts.heading, color: colors.text, marginBottom: 10 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14, marginBottom: 12 },
   field: { gap: 6 },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  toggleLabel: { fontFamily: fonts.body, fontSize: 15, color: colors.text },
   fieldLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.text, opacity: 0.7 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepperButton: {

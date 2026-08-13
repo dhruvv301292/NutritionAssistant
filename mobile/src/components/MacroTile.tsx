@@ -29,7 +29,8 @@ export default function MacroTile({ label, value, goal, unit = 'g', color, onPre
 
 const styles = StyleSheet.create({
   tile: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderRadius: 26,
     padding: 14,

@@ -21,9 +21,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 func (r *Repository) Get(ctx context.Context, userID int) (Goals, error) {
 	var g Goals
 	err := r.pool.QueryRow(ctx, `
-		SELECT user_id, calorie_goal, protein_goal, carb_goal, fat_goal, fiber_goal
+		SELECT user_id, calorie_goal, protein_goal, carb_goal, fat_goal, fiber_goal, tracked_macros
 		FROM user_goals WHERE user_id = $1
-	`, userID).Scan(&g.UserID, &g.CalorieGoal, &g.ProteinGoal, &g.CarbGoal, &g.FatGoal, &g.FiberGoal)
+	`, userID).Scan(&g.UserID, &g.CalorieGoal, &g.ProteinGoal, &g.CarbGoal, &g.FatGoal, &g.FiberGoal, &g.TrackedMacros)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Defaults(userID), nil
 	}
@@ -35,16 +35,17 @@ func (r *Repository) Get(ctx context.Context, userID int) (Goals, error) {
 
 func (r *Repository) Upsert(ctx context.Context, g Goals) (Goals, error) {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO user_goals (user_id, calorie_goal, protein_goal, carb_goal, fat_goal, fiber_goal, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, now())
+		INSERT INTO user_goals (user_id, calorie_goal, protein_goal, carb_goal, fat_goal, fiber_goal, tracked_macros, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, now())
 		ON CONFLICT (user_id) DO UPDATE SET
 			calorie_goal = EXCLUDED.calorie_goal,
 			protein_goal = EXCLUDED.protein_goal,
 			carb_goal = EXCLUDED.carb_goal,
 			fat_goal = EXCLUDED.fat_goal,
 			fiber_goal = EXCLUDED.fiber_goal,
+			tracked_macros = EXCLUDED.tracked_macros,
 			updated_at = now()
-	`, g.UserID, g.CalorieGoal, g.ProteinGoal, g.CarbGoal, g.FatGoal, g.FiberGoal)
+	`, g.UserID, g.CalorieGoal, g.ProteinGoal, g.CarbGoal, g.FatGoal, g.FiberGoal, g.TrackedMacros)
 	if err != nil {
 		return Goals{}, err
 	}
