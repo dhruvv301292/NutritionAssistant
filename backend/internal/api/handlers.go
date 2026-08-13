@@ -415,7 +415,7 @@ func (h *Handler) ChatMeal(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]meals.ItemRequest, len(parsed.Items))
 	for i, p := range parsed.Items {
-		items[i] = meals.ItemRequest{FoodName: p.Name, Quantity: p.Quantity, Unit: p.Unit, Preparation: p.Preparation}
+		items[i] = meals.ItemRequest{FoodName: p.Name, Quantity: p.Quantity, Unit: p.Unit, Preparation: p.Preparation, Brand: p.Brand}
 	}
 
 	result := h.mealService.Calculate(r.Context(), items)

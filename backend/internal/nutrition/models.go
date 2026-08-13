@@ -1,14 +1,15 @@
 package nutrition
 
 type Food struct {
-	ID           int     `json:"id"`
-	Name         string  `json:"name"`
-	Calories     float64 `json:"calories"`
-	Protein      float64 `json:"protein"`
-	Carbs        float64 `json:"carbs"`
-	Fat          float64 `json:"fat"`
-	Fiber        float64 `json:"fiber"`
-	Sodium       float64 `json:"sodium"`
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	Brand        *string  `json:"brand,omitempty"`
+	Calories     float64  `json:"calories"`
+	Protein      float64  `json:"protein"`
+	Carbs        float64  `json:"carbs"`
+	Fat          float64  `json:"fat"`
+	Fiber        float64  `json:"fiber"`
+	Sodium       float64  `json:"sodium"`
 	Unit         string   `json:"unit"`
 	UnitQuantity float64  `json:"unitquantity"`
 	GramsPerUnit *float64 `json:"grams_per_unit,omitempty"`

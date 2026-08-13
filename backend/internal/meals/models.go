@@ -11,6 +11,7 @@ type ItemRequest struct {
 	Quantity    float64 `json:"quantity"`
 	Unit        string  `json:"unit"`
 	Preparation *string `json:"preparation,omitempty"`
+	Brand       *string `json:"brand,omitempty"`
 }
 
 type CalculateRequest struct {

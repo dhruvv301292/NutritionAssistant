@@ -11,6 +11,7 @@ import (
 
 const parseMealToolName = "record_meal_items"
 const estimateNutritionToolName = "record_nutrition_estimate"
+const verifyBrandMatchToolName = "record_brand_match_verdict"
 
 var errNoToolUse = errors.New("model did not return a tool_use block")
 
@@ -41,7 +42,7 @@ func (c *Client) ParseMeal(ctx context.Context, text string) (ParsedMeal, error)
 						"quantity":    map[string]any{"type": "number"},
 						"unit":        map[string]any{"type": "string", "enum": []string{"grams", "ounces", "count"}, "description": "grams/ounces for weight, count for discrete items (eggs, bottles, bars) — always convert other units (cups, tbsp, etc.) to your best estimate in grams"},
 						"preparation": map[string]any{"type": []string{"string", "null"}, "description": "e.g. 'raw', 'grilled', 'cooked' — null if not specified"},
-						"brand":       map[string]any{"type": []string{"string", "null"}, "description": "e.g. 'Quest' — null if not specified"},
+						"brand":       map[string]any{"type": []string{"string", "null"}, "description": "e.g. 'Quest'. Expand common brand abbreviations/initialisms to the full brand name (e.g. 'ON' or 'on' before a protein product means 'Optimum Nutrition', not the word \"on\" — don't fold it into name or drop it as a filler word). Null only if no brand is mentioned at all."},
 					},
 					"required": []string{"name", "quantity", "unit", "preparation", "brand"},
 				},
@@ -170,6 +171,60 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 	}
 
 	return NutritionEstimate{}, errNoToolUse
+}
+
+// VerifyBrandMatch asks the model whether a candidate database row is the
+// same branded product the user asked for. This is a last-resort tiebreaker
+// for the case where trigram brand similarity falls in an ambiguous middle
+// zone (see foods/repository.go's brandAmbiguousLow/High) — not confidently
+// a match, not confidently a mismatch (e.g. "opti nutrition" vs "optimum
+// nutrition", or a minor misspelling). The model only answers yes/no on a
+// specific pairing; it never generates nutrition values here, so it can't
+// introduce the kind of confidently-wrong data EstimateNutrition is
+// explicitly allowed to (and which still goes through human review).
+func (c *Client) VerifyBrandMatch(ctx context.Context, queryBrand, queryProduct, candidateBrand, candidateName string) (bool, error) {
+	tool := anthropic.ToolUnionParamOfTool(anthropic.ToolInputSchemaParam{
+		Properties: map[string]any{
+			"same_product": map[string]any{"type": "boolean", "description": "true only if the candidate is the same specific branded product the user asked for — not just the same category or a similar product from a different brand"},
+		},
+		Required: []string{"same_product"},
+	}, verifyBrandMatchToolName)
+
+	prompt := fmt.Sprintf(
+		"User asked for: %q (brand: %q)\nDatabase candidate: %q (brand: %q)\n\n"+
+			"Is the database candidate the same specific branded product the user asked "+
+			"for? Answer false if it's a different brand, even if the product type "+
+			"matches (e.g. a different brand's protein shake is NOT a match).",
+		queryProduct, queryBrand, candidateName, candidateBrand,
+	)
+
+	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:      anthropic.ModelClaudeSonnet4_5,
+		MaxTokens:  256,
+		ToolChoice: anthropic.ToolChoiceParamOfTool(verifyBrandMatchToolName),
+		Tools:      []anthropic.ToolUnionParam{tool},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+	})
+	if err != nil {
+		return false, fmt.Errorf("anthropic request failed: %w", err)
+	}
+
+	for _, block := range message.Content {
+		if block.Type != "tool_use" || block.Name != verifyBrandMatchToolName {
+			continue
+		}
+		var verdict struct {
+			SameProduct bool `json:"same_product"`
+		}
+		if err := json.Unmarshal(block.Input, &verdict); err != nil {
+			return false, fmt.Errorf("failed to decode tool_use input: %w", err)
+		}
+		return verdict.SameProduct, nil
+	}
+
+	return false, errNoToolUse
 }
 
 func extractEstimate(message *anthropic.Message) (NutritionEstimate, bool) {

@@ -14,6 +14,7 @@ import (
 // or a real external API.
 type fakeSearcher struct {
 	byQuery         map[string][]foods.ScoredFood
+	brandedByBrand  map[string][]foods.ScoredFood
 	externalByQuery map[string]*nutrition.Food
 	err             error
 }
@@ -25,8 +26,26 @@ func (f *fakeSearcher) Resolve(_ context.Context, query string) ([]foods.ScoredF
 	return f.byQuery[query], nil
 }
 
-func (f *fakeSearcher) FetchExternal(_ context.Context, query string) *nutrition.Food {
+func (f *fakeSearcher) ResolveBranded(_ context.Context, brand, _ string) ([]foods.ScoredFood, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.brandedByBrand[brand], nil
+}
+
+func (f *fakeSearcher) FetchExternal(_ context.Context, query, _ string) *nutrition.Food {
 	return f.externalByQuery[query]
+}
+
+// fakeVerifier lets tests control the LLM brand-verification verdict
+// without hitting a real model.
+type fakeVerifier struct {
+	verdict bool
+	err     error
+}
+
+func (f *fakeVerifier) VerifyBrandMatch(_ context.Context, _, _, _, _ string) (bool, error) {
+	return f.verdict, f.err
 }
 
 func chickenThigh() nutrition.Food {
@@ -159,6 +178,91 @@ func TestMatcher_ResolveItems_ExternalMatchIsUnconfirmedNotAutoTrusted(t *testin
 	}
 	if results[0].Error != "" {
 		t.Errorf("expected no error for an external match awaiting confirmation, got %q", results[0].Error)
+	}
+}
+
+func questShake() nutrition.Food {
+	brand := "Quest"
+	return nutrition.Food{ID: 5, Name: "Protein Shake", Brand: &brand, Unit: "count", UnitQuantity: 1, Calories: 160}
+}
+
+func optimumShake() nutrition.Food {
+	brand := "Optimum Nutrition"
+	return nutrition.Food{ID: 6, Name: "Protein Shake", Brand: &brand, Unit: "count", UnitQuantity: 1, Calories: 140}
+}
+
+func brandedItem(brand string) ItemRequest {
+	return ItemRequest{FoodName: "protein shake", Brand: &brand, Quantity: 1, Unit: "count"}
+}
+
+func TestMatcher_ResolveItems_BrandHardThresholdAccepted(t *testing.T) {
+	fake := &fakeSearcher{brandedByBrand: map[string][]foods.ScoredFood{
+		"Quest": {{Food: questShake(), Similarity: 0.9, BrandSimilarity: 1.0}},
+	}}
+	matcher := &Matcher{foodService: fake, verifier: &fakeVerifier{}}
+
+	results := matcher.ResolveItems(context.Background(), []ItemRequest{brandedItem("Quest")})
+
+	if results[0].MatchedFood == nil {
+		t.Fatal("expected a confirmed match for a brand clearing the hard threshold")
+	}
+	if results[0].MatchedFood.Name != "Protein Shake" || results[0].MatchedFood.Brand == nil || *results[0].MatchedFood.Brand != "Quest" {
+		t.Errorf("matched wrong food: %+v", results[0].MatchedFood)
+	}
+}
+
+// This is the exact bug the two-stage design fixes: a wrong-brand,
+// right-category candidate (Quest, when the user asked for Optimum
+// Nutrition) must never be silently accepted just because the product name
+// ("protein shake") matches well overall.
+func TestMatcher_ResolveItems_WrongBrandRejectedEvenWithGoodNameMatch(t *testing.T) {
+	fake := &fakeSearcher{
+		brandedByBrand: map[string][]foods.ScoredFood{
+			// "Optimum Nutrition" vs "Quest" brand similarity is low —
+			// below brandAmbiguousLow, so no LLM call should even happen.
+			"Optimum Nutrition": {{Food: questShake(), Similarity: 0.7, BrandSimilarity: 0.1}},
+		},
+		externalByQuery: map[string]*nutrition.Food{
+			"Optimum Nutrition protein shake": {Name: "Optimum Nutrition Gold Standard", Unit: "count", UnitQuantity: 1, Calories: 120},
+		},
+	}
+	verifier := &fakeVerifier{verdict: true} // would wrongly say yes if called
+	matcher := &Matcher{foodService: fake, verifier: verifier}
+
+	results := matcher.ResolveItems(context.Background(), []ItemRequest{brandedItem("Optimum Nutrition")})
+
+	if results[0].MatchedFood != nil {
+		t.Fatalf("expected the wrong-brand candidate to be rejected, got matched food %+v", results[0].MatchedFood)
+	}
+	if results[0].UnconfirmedFood == nil {
+		t.Fatal("expected fallthrough to external lookup with brand preserved")
+	}
+}
+
+func TestMatcher_ResolveItems_AmbiguousBrandUsesLLMVerifier(t *testing.T) {
+	fake := &fakeSearcher{brandedByBrand: map[string][]foods.ScoredFood{
+		// In the ambiguous middle zone (0.4-0.6) — e.g. an abbreviation.
+		"Opti Nutrition": {{Food: optimumShake(), Similarity: 0.75, BrandSimilarity: 0.5}},
+	}}
+	matcher := &Matcher{foodService: fake, verifier: &fakeVerifier{verdict: true}}
+
+	results := matcher.ResolveItems(context.Background(), []ItemRequest{brandedItem("Opti Nutrition")})
+
+	if results[0].MatchedFood == nil {
+		t.Fatal("expected the LLM verifier's yes verdict to confirm the match")
+	}
+}
+
+func TestMatcher_ResolveItems_AmbiguousBrandRejectedOnLLMNo(t *testing.T) {
+	fake := &fakeSearcher{brandedByBrand: map[string][]foods.ScoredFood{
+		"Opti Nutrition": {{Food: optimumShake(), Similarity: 0.75, BrandSimilarity: 0.5}},
+	}}
+	matcher := &Matcher{foodService: fake, verifier: &fakeVerifier{verdict: false}}
+
+	results := matcher.ResolveItems(context.Background(), []ItemRequest{brandedItem("Opti Nutrition")})
+
+	if results[0].MatchedFood != nil {
+		t.Fatal("expected the LLM verifier's no verdict to reject the match")
 	}
 }
 

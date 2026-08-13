@@ -80,7 +80,11 @@ func (s *Service) SearchWithScore(ctx context.Context, query string) ([]ScoredFo
 // returns the first hit as an unconfirmed nutrition.Food (ID 0, not
 // persisted). Callers must show this to the user for review/edit and save
 // it via Create only once confirmed — see the Create doc comment for why.
-func (s *Service) FetchExternal(ctx context.Context, query string) *nutrition.Food {
+// brand, if non-empty, is stamped onto the returned draft so a subsequent
+// Create persists it as a proper branded row rather than losing that
+// context (the LLM/external provider only sees the combined query string,
+// not a structured brand field).
+func (s *Service) FetchExternal(ctx context.Context, query, brand string) *nutrition.Food {
 	for _, provider := range s.providers {
 		result, err := provider.Lookup(ctx, query)
 		if err != nil {
@@ -99,6 +103,9 @@ func (s *Service) FetchExternal(ctx context.Context, query string) *nutrition.Fo
 			Fat:      result.Fat,
 			Fiber:    result.Fiber,
 			Sodium:   result.Sodium,
+		}
+		if brand != "" {
+			food.Brand = &brand
 		}
 		switch {
 		case result.Unit != "":
@@ -124,4 +131,14 @@ func (s *Service) FetchExternal(ctx context.Context, query string) *nutrition.Fo
 // result as an unconfirmed draft instead of silently trusting it.
 func (s *Service) Resolve(ctx context.Context, query string) ([]ScoredFood, error) {
 	return s.SearchWithScore(ctx, query)
+}
+
+// ResolveBranded is the read-only two-stage lookup for a query that
+// specifies a brand: candidate generation via combined brand+name trigram
+// similarity, with each candidate's brand-only similarity carried alongside
+// so the caller (Matcher) can apply the hard brand filter / ambiguous-zone
+// LLM-verification logic — see repository.SearchBranded's doc comment for
+// why that decision doesn't belong here.
+func (s *Service) ResolveBranded(ctx context.Context, brand, productName string) ([]ScoredFood, error) {
+	return s.repo.SearchBranded(ctx, strings.TrimSpace(brand), strings.TrimSpace(productName))
 }

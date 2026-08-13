@@ -65,7 +65,7 @@ func main() {
 	foodService := foods.NewService(foodRepo, aiEstimatorProvider{client: aiClient})
 
 	mealRepo := meals.NewRepository(pool)
-	matcher := meals.NewMatcher(foodService)
+	matcher := meals.NewMatcher(foodService, aiClient)
 	mealService := meals.NewService(mealRepo, matcher, foodService)
 
 	goalsRepo := goals.NewRepository(pool)
