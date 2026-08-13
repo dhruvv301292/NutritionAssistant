@@ -5,7 +5,7 @@ import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
 import { MACROS } from '../macros';
-import { colors, fonts, radius, shadow } from '../theme';
+import { colors, fonts, radius } from '../theme';
 import type { Goals, TrackedMacro } from '../types/api';
 
 type FieldKey = 'calorie_goal' | 'protein_goal' | 'fiber_goal';
@@ -31,31 +31,31 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
 
   useEffect(() => { if (focused) load(); }, [focused, load]);
 
-  function adjust(key: FieldKey, delta: number) {
-    setGoals((prev) => (prev ? { ...prev, [key]: Math.max(0, prev[key] + delta) } : prev));
-  }
-
-  function toggleMacro(key: TrackedMacro) {
-    setGoals((prev) => {
-      if (!prev) return prev;
-      const tracked = prev.tracked_macros.includes(key)
-        ? prev.tracked_macros.filter((m) => m !== key)
-        : [...prev.tracked_macros, key];
-      return { ...prev, tracked_macros: tracked };
-    });
-  }
-
-  async function handleSave() {
-    if (!goals) return;
+  async function persist(next: Goals) {
+    setGoals(next);
     setSaving(true);
+    setError(null);
     try {
-      const saved = await putGoals(goals);
+      const saved = await putGoals(next);
       setGoals(saved);
     } catch {
       setError('Could not save goals.');
     } finally {
       setSaving(false);
     }
+  }
+
+  function adjust(key: FieldKey, delta: number) {
+    if (!goals) return;
+    persist({ ...goals, [key]: Math.max(0, goals[key] + delta) });
+  }
+
+  function toggleMacro(key: TrackedMacro) {
+    if (!goals) return;
+    const tracked = goals.tracked_macros.includes(key)
+      ? goals.tracked_macros.filter((m) => m !== key)
+      : [...goals.tracked_macros, key];
+    persist({ ...goals, tracked_macros: tracked });
   }
 
   return (
@@ -106,9 +106,7 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
               ))}
             </View>
 
-            <Pressable style={[styles.saveButton, shadow.sm]} onPress={handleSave} disabled={saving}>
-              <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save goals'}</Text>
-            </Pressable>
+            {saving && <ActivityIndicator color={colors.accent700} style={{ marginBottom: 8 }} />}
 
             {state.status === 'signedIn' && (
               <Text style={styles.accountEmail}>{state.user.email}</Text>
@@ -154,12 +152,5 @@ const styles = StyleSheet.create({
   stepperButtonPrimary: { backgroundColor: colors.accent },
   stepperButtonText: { fontFamily: fonts.heading, fontSize: 19, color: colors.text },
   stepperValue: { flex: 1, textAlign: 'center', fontFamily: fonts.heading, fontSize: 28, color: colors.text },
-  saveButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.pill,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonText: { color: colors.bg, fontFamily: fonts.heading, fontSize: 14 },
   accountEmail: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.5, marginTop: 20, textAlign: 'center' },
 });
