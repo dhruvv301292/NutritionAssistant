@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const usdaSearchURL = "https://api.nal.usda.gov/fdc/v1/foods/search"
@@ -90,6 +91,41 @@ func (c *USDAClient) Lookup(ctx context.Context, query string) (*Result, error) 
 	return toResult(food), nil
 }
 
+// cookedKeywords/rawKeywords classify a USDA food description by
+// preparation state, matched case-insensitively against the description
+// text. USDA's own wording varies ("cooked", "roasted", "boiled", etc.)
+// rather than using a single consistent term.
+var (
+	cookedKeywords = []string{"cooked", "roasted", "boiled", "grilled", "baked", "braised", "steamed", "fried", "broiled", "poached"}
+	rawKeywords    = []string{"raw"}
+)
+
+func describesCooked(description string) bool {
+	lower := strings.ToLower(description)
+	for _, kw := range cookedKeywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func describesRaw(description string) bool {
+	lower := strings.ToLower(description)
+	for _, kw := range rawKeywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// wantsCooked/wantsRaw report whether the caller's query itself asked for a
+// specific preparation state (matcher.externalQuery prefixes the food name
+// with the parsed preparation, e.g. "cooked chicken thigh").
+func wantsCooked(query string) bool { return describesCooked(query) }
+func wantsRaw(query string) bool    { return describesRaw(query) }
+
 // toResult normalizes a usdaFood into a Result, or nil if it's missing
 // calories entirely — USDA occasionally has reference entries with no
 // Energy value populated, and a zero-calorie food is worse to insert than
@@ -132,14 +168,24 @@ func toResult(food *usdaFood) *Result {
 	return result
 }
 
+// usdaCandidatePoolSize is how many top-ranked USDA results we fetch and
+// rerank locally, rather than blindly trusting result #1. USDA's relevance
+// ranking doesn't account for raw/cooked state at all, so when the caller's
+// query specifies one (see matcher.externalQuery), the correct entry is
+// often #2 or #3, not #1.
+const usdaCandidatePoolSize = 5
+
 // search runs a single USDA search request, optionally restricted to the
-// given comma-separated dataType list, and returns the top-ranked result
-// (nil if there were none).
+// given comma-separated dataType list, and returns the best-matching result
+// (nil if there were none). "Best" means: if the query specifies a
+// preparation state (raw/cooked), prefer the top-ranked candidate whose
+// description agrees with that state over USDA's raw #1 ranking; otherwise
+// just take #1.
 func (c *USDAClient) search(ctx context.Context, query, dataTypes string) (*usdaFood, error) {
 	params := url.Values{}
 	params.Set("api_key", c.apiKey)
 	params.Set("query", query)
-	params.Set("pageSize", "1")
+	params.Set("pageSize", fmt.Sprintf("%d", usdaCandidatePoolSize))
 	if dataTypes != "" {
 		params.Set("dataType", dataTypes)
 	}
@@ -165,6 +211,20 @@ func (c *USDAClient) search(ctx context.Context, query, dataTypes string) (*usda
 	}
 	if len(parsed.Foods) == 0 {
 		return nil, nil
+	}
+
+	if wantsCooked(query) {
+		for i := range parsed.Foods {
+			if describesCooked(parsed.Foods[i].Description) {
+				return &parsed.Foods[i], nil
+			}
+		}
+	} else if wantsRaw(query) {
+		for i := range parsed.Foods {
+			if describesRaw(parsed.Foods[i].Description) {
+				return &parsed.Foods[i], nil
+			}
+		}
 	}
 	return &parsed.Foods[0], nil
 }

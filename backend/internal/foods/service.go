@@ -30,6 +30,12 @@ type ExternalResult struct {
 	Fiber           float64
 	Sodium          float64
 	GramsPerServing *float64
+	// Unit/UnitQuantity, when set, are used as-is instead of the
+	// GramsPerServing-based inference below — the AI estimator picks these
+	// itself (grams/100 vs count/1) rather than always defaulting to a
+	// 100g basis.
+	Unit         string
+	UnitQuantity float64
 }
 
 type Service struct {
@@ -94,11 +100,15 @@ func (s *Service) FetchExternal(ctx context.Context, query string) *nutrition.Fo
 			Fiber:    result.Fiber,
 			Sodium:   result.Sodium,
 		}
-		if result.GramsPerServing != nil {
+		switch {
+		case result.Unit != "":
+			food.Unit = result.Unit
+			food.UnitQuantity = result.UnitQuantity
+		case result.GramsPerServing != nil:
 			food.Unit = "count"
 			food.UnitQuantity = 1
 			food.GramsPerUnit = result.GramsPerServing
-		} else {
+		default:
 			food.Unit = "grams"
 			food.UnitQuantity = 100
 		}

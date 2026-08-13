@@ -55,6 +55,19 @@ func isAmbiguous(candidates []foods.ScoredFood) bool {
 	return len(candidates) > 1 && candidates[0].Similarity-candidates[1].Similarity < ambiguityGap
 }
 
+// externalQuery builds the search string sent to external food databases.
+// Raw vs. cooked nutrition values differ substantially (water loss on
+// cooking concentrates most macros per gram), so folding a known
+// preparation into the query lets USDA/FatSecret rank a matching-state
+// entry first instead of defaulting to whichever state happens to rank
+// highest for the bare food name.
+func externalQuery(item ItemRequest) string {
+	if item.Preparation == nil || *item.Preparation == "" {
+		return item.FoodName
+	}
+	return *item.Preparation + " " + item.FoodName
+}
+
 func (m *Matcher) resolveItem(ctx context.Context, item ItemRequest) ItemResult {
 	result := ItemResult{
 		FoodName: item.FoodName,
@@ -69,12 +82,11 @@ func (m *Matcher) resolveItem(ctx context.Context, item ItemRequest) ItemResult 
 	}
 
 	if len(candidates) == 0 {
-		// Nothing in our own database — try external food databases, but
-		// surface any hit as an unconfirmed draft rather than trusting it
-		// automatically. External data (USDA in particular) has shown up
-		// with wrong or missing values for plain-language queries, so a
-		// human reviews/edits before it's saved to the foods table.
-		if externalFood := m.foodService.FetchExternal(ctx, item.FoodName); externalFood != nil {
+		// Nothing in our own database — ask the LLM for a best-guess
+		// estimate, but surface it as an unconfirmed draft rather than
+		// trusting it automatically. A human reviews/edits before it's
+		// saved to the foods table (see foods.Service.Create).
+		if externalFood := m.foodService.FetchExternal(ctx, externalQuery(item)); externalFood != nil {
 			result.UnconfirmedFood = externalFood
 			return result
 		}

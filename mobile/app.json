@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow Nutrition Assistant to use speech recognition to log meals by voice.",
-        "NSMicrophoneUsageDescription": "Allow Nutrition Assistant to use the microphone to log meals by voice."
+        "NSMicrophoneUsageDescription": "Allow Nutrition Assistant to use the microphone to log meals by voice.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.dhruvvashisht.nutrichat",
       "usesAppleSignIn": true
@@ -26,6 +27,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.dhruvvashisht.nutrichat"
@@ -50,6 +52,12 @@
       "eas": {
         "projectId": "cff921b2-dd7b-47f6-8a04-70126ee2274c"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cff921b2-dd7b-47f6-8a04-70126ee2274c"
     }
   }
 }

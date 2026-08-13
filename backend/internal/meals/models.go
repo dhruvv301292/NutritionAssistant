@@ -7,9 +7,10 @@ import (
 )
 
 type ItemRequest struct {
-	FoodName string  `json:"food_name"`
-	Quantity float64 `json:"quantity"`
-	Unit     string  `json:"unit"`
+	FoodName    string  `json:"food_name"`
+	Quantity    float64 `json:"quantity"`
+	Unit        string  `json:"unit"`
+	Preparation *string `json:"preparation,omitempty"`
 }
 
 type CalculateRequest struct {

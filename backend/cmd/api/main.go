@@ -10,7 +10,6 @@ import (
 	"github.com/dhruvv301292/nutrichat/internal/auth"
 	"github.com/dhruvv301292/nutrichat/internal/db"
 	"github.com/dhruvv301292/nutrichat/internal/foods"
-	"github.com/dhruvv301292/nutrichat/internal/fooddata"
 	"github.com/dhruvv301292/nutrichat/internal/goals"
 	"github.com/dhruvv301292/nutrichat/internal/meals"
 	"github.com/dhruvv301292/nutrichat/internal/users"
@@ -19,35 +18,33 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// usdaProvider and fatSecretProvider adapt the concrete fooddata clients to
-// foods.Service's externalLookup interface, translating *fooddata.Result to
-// *foods.ExternalResult. Kept here rather than in fooddata so that package
-// doesn't need to depend on foods.
-type usdaProvider struct{ client *fooddata.USDAClient }
+// aiEstimatorProvider adapts ai.Client.EstimateNutrition to foods.Service's
+// ExternalLookup interface. USDA/FatSecret were dropped from this path
+// entirely — both returned confidently wrong matches for anything outside
+// generic staple foods (a "David protein bar" search matched an unrelated
+// South Beach bar; "jasmine rice" matched rice crackers) with no reliable
+// way to detect the mismatch before it reached the user. The LLM estimate
+// was already the last-resort fallback and already goes through the same
+// human-review-before-save gate (see foods.Service.Create), so promoting it
+// to the only source keeps that safety property while dropping a source
+// that was silently wrong more often than it was silently right.
+type aiEstimatorProvider struct{ client *ai.Client }
 
-func (p usdaProvider) Lookup(ctx context.Context, query string) (*foods.ExternalResult, error) {
-	return adaptResult(p.client.Lookup(ctx, query))
-}
-
-type fatSecretProvider struct{ client *fooddata.FatSecretClient }
-
-func (p fatSecretProvider) Lookup(ctx context.Context, query string) (*foods.ExternalResult, error) {
-	return adaptResult(p.client.Lookup(ctx, query))
-}
-
-func adaptResult(r *fooddata.Result, err error) (*foods.ExternalResult, error) {
-	if err != nil || r == nil {
+func (p aiEstimatorProvider) Lookup(ctx context.Context, query string) (*foods.ExternalResult, error) {
+	estimate, err := p.client.EstimateNutrition(ctx, query)
+	if err != nil {
 		return nil, err
 	}
 	return &foods.ExternalResult{
-		Name:            r.Name,
-		Calories:        r.Calories,
-		Protein:         r.Protein,
-		Carbs:           r.Carbs,
-		Fat:             r.Fat,
-		Fiber:           r.Fiber,
-		Sodium:          r.Sodium,
-		GramsPerServing: r.GramsPerServing,
+		Name:         estimate.Name,
+		Calories:     estimate.Calories,
+		Protein:      estimate.Protein,
+		Carbs:        estimate.Carbs,
+		Fat:          estimate.Fat,
+		Fiber:        estimate.Fiber,
+		Sodium:       estimate.Sodium,
+		Unit:         estimate.Unit,
+		UnitQuantity: estimate.UnitQuantity,
 	}, nil
 }
 
@@ -63,20 +60,13 @@ func main() {
 
 	foodRepo := foods.NewRepository(pool)
 
-	var externalProviders []foods.ExternalLookup
-	if usdaKey := os.Getenv("USDA_FDC_API_KEY"); usdaKey != "" {
-		externalProviders = append(externalProviders, usdaProvider{client: fooddata.NewUSDAClient(usdaKey)})
-	}
-	if fsID, fsSecret := os.Getenv("FATSECRET_CLIENT_ID"), os.Getenv("FATSECRET_CLIENT_SECRET"); fsID != "" && fsSecret != "" {
-		externalProviders = append(externalProviders, fatSecretProvider{client: fooddata.NewFatSecretClient(fsID, fsSecret)})
-	}
-	foodService := foods.NewService(foodRepo, externalProviders...)
+	aiClient := ai.NewClient()
+
+	foodService := foods.NewService(foodRepo, aiEstimatorProvider{client: aiClient})
 
 	mealRepo := meals.NewRepository(pool)
 	matcher := meals.NewMatcher(foodService)
 	mealService := meals.NewService(mealRepo, matcher, foodService)
-
-	aiClient := ai.NewClient()
 
 	goalsRepo := goals.NewRepository(pool)
 

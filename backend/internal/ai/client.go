@@ -49,6 +49,11 @@ func (c *Client) ParseMeal(ctx context.Context, text string) (ParsedMeal, error)
 		},
 		Required: []string{"items"},
 	}, parseMealToolName)
+	// Cache breakpoint: this tool schema is identical on every call, so
+	// caching it means only the user's meal text (a few dozen tokens) is
+	// billed at full price — the schema itself is billed once per cache
+	// window (default 5 min) instead of on every request.
+	tool.OfTool.CacheControl = anthropic.NewCacheControlEphemeralParam()
 
 	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:      anthropic.ModelClaudeSonnet4_5,
@@ -99,32 +104,84 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 		},
 		Required: []string{"name", "calories", "protein", "carbs", "fat", "fiber", "sodium", "unit", "unitquantity"},
 	}, estimateNutritionToolName)
+	// Cache breakpoints on both the tool schema and the system instructions
+	// below: neither changes between calls, only the food name does. Once
+	// cached, a repeat estimate request only pays full price for the short
+	// food-name user message.
+	tool.OfTool.CacheControl = anthropic.NewCacheControlEphemeralParam()
 
-	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:      anthropic.ModelClaudeSonnet4_5,
-		MaxTokens:  1024,
-		ToolChoice: anthropic.ToolChoiceParamOfTool(estimateNutritionToolName),
-		Tools:      []anthropic.ToolUnionParam{tool},
+	system := anthropic.TextBlockParam{
+		Text: "Estimate typical nutrition values for the given food. If a " +
+			"preparation state (raw/cooked/grilled/etc.) is mentioned, use " +
+			"values for that specific state — cooked and raw nutrition profiles " +
+			"differ meaningfully (cooking concentrates most nutrients per gram via " +
+			"water loss). If the food is a branded product or a chain restaurant " +
+			"item, use the web_search tool to check the brand's or chain's official " +
+			"nutrition page for exact published values before estimating — don't " +
+			"rely on memory alone for these, since exact values matter and change " +
+			"over time. For unbranded generic foods, a web search usually isn't " +
+			"necessary. Once you have the values (searched or estimated), call " +
+			estimateNutritionToolName + " with the result.",
+	}
+	system.CacheControl = anthropic.NewCacheControlEphemeralParam()
+
+	webSearch := anthropic.ToolUnionParam{OfWebSearchTool20250305: &anthropic.WebSearchTool20250305Param{
+		MaxUses: anthropic.Int(3),
+	}}
+
+	// ToolChoice is left at the default (auto) rather than forced onto
+	// estimateNutritionToolName, since forcing it would prevent Claude from
+	// ever calling web_search first — it needs the freedom to search, then
+	// call our tool with what it found. web_search itself runs server-side
+	// within this single request/response; no manual tool-result loop
+	// needed here.
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeSonnet4_5,
+		MaxTokens: 2048,
+		System:    []anthropic.TextBlockParam{system},
+		Tools:     []anthropic.ToolUnionParam{tool, webSearch},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(
-				"Estimate typical nutrition values for: " + foodName,
-			)),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(foodName)),
 		},
-	})
+	}
+
+	message, err := c.anthropic.Messages.New(ctx, params)
 	if err != nil {
 		return NutritionEstimate{}, fmt.Errorf("anthropic request failed: %w", err)
 	}
+	if estimate, ok := extractEstimate(message); ok {
+		return estimate, nil
+	}
 
+	// auto tool_choice occasionally lets the model stop after searching
+	// without ever calling our tool (e.g. it ran out of budget mid-search,
+	// or decided the search results were the final answer). Retry once,
+	// forcing the tool directly with no web_search available — worse
+	// accuracy for that one retry, but still correct behavior (an
+	// estimate) rather than a hard failure on what's now the primary path.
+	params.ToolChoice = anthropic.ToolChoiceParamOfTool(estimateNutritionToolName)
+	params.Tools = []anthropic.ToolUnionParam{tool}
+	message, err = c.anthropic.Messages.New(ctx, params)
+	if err != nil {
+		return NutritionEstimate{}, fmt.Errorf("anthropic request failed: %w", err)
+	}
+	if estimate, ok := extractEstimate(message); ok {
+		return estimate, nil
+	}
+
+	return NutritionEstimate{}, errNoToolUse
+}
+
+func extractEstimate(message *anthropic.Message) (NutritionEstimate, bool) {
 	for _, block := range message.Content {
 		if block.Type != "tool_use" || block.Name != estimateNutritionToolName {
 			continue
 		}
 		var estimate NutritionEstimate
 		if err := json.Unmarshal(block.Input, &estimate); err != nil {
-			return NutritionEstimate{}, fmt.Errorf("failed to decode tool_use input: %w", err)
+			return NutritionEstimate{}, false
 		}
-		return estimate, nil
+		return estimate, true
 	}
-
-	return NutritionEstimate{}, errNoToolUse
+	return NutritionEstimate{}, false
 }

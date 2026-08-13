@@ -318,9 +318,9 @@ type EstimateFoodRequest struct {
 	Name string `json:"name"`
 }
 
-// EstimateFood is the last-resort fallback when a food is in neither our
-// database nor any external food API (see ai.Client.EstimateNutrition):
-// the LLM's guess is returned as a draft only — nothing is persisted here.
+// EstimateFood is the fallback when a food isn't in our own database (see
+// ai.Client.EstimateNutrition): the LLM's guess is returned as a draft
+// only — nothing is persisted here.
 // The client shows it as an editable form; POST /foods with the
 // user-confirmed values is what actually saves it.
 func (h *Handler) EstimateFood(w http.ResponseWriter, r *http.Request) {
@@ -415,7 +415,7 @@ func (h *Handler) ChatMeal(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]meals.ItemRequest, len(parsed.Items))
 	for i, p := range parsed.Items {
-		items[i] = meals.ItemRequest{FoodName: p.Name, Quantity: p.Quantity, Unit: p.Unit}
+		items[i] = meals.ItemRequest{FoodName: p.Name, Quantity: p.Quantity, Unit: p.Unit, Preparation: p.Preparation}
 	}
 
 	result := h.mealService.Calculate(r.Context(), items)
