@@ -94,6 +94,7 @@ func brandOf(item ItemRequest) string {
 func (m *Matcher) resolveItem(ctx context.Context, item ItemRequest) ItemResult {
 	result := ItemResult{
 		FoodName: item.FoodName,
+		Brand:    item.Brand,
 		Quantity: item.Quantity,
 		Unit:     item.Unit,
 	}

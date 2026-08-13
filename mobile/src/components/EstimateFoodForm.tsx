@@ -98,11 +98,7 @@ export default function EstimateFoodForm({ foodName, estimate, onEstimateChange,
 
   return (
     <View style={styles.container}>
-      <Text style={styles.warningText}>
-        {externalMatch
-          ? 'Found in an external food database — review and edit before saving:'
-          : 'AI-suggested values — review and edit before saving:'}
-      </Text>
+      <Text style={styles.warningText}>Please review before logging the meal:</Text>
       <View style={styles.fieldRow}>
         <Text style={styles.fieldLabel}>Values are per</Text>
         <View style={styles.basisRow}>

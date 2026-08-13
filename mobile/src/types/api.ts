@@ -24,6 +24,7 @@ export type Nutrition = {
 
 export type ItemResult = {
   food_name: string;
+  brand?: string;
   quantity: number;
   unit: string;
   matched_food?: Food;

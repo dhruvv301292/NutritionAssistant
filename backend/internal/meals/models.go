@@ -20,6 +20,7 @@ type CalculateRequest struct {
 
 type ItemResult struct {
 	FoodName        string               `json:"food_name"`
+	Brand           *string              `json:"brand,omitempty"`
 	Quantity        float64              `json:"quantity"`
 	Unit            string               `json:"unit"`
 	MatchedFood     *nutrition.Food      `json:"matched_food,omitempty"`

@@ -213,48 +213,76 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
               );
             }
             const { response, saved, saving, estimates } = entry;
+
+            function itemDisplayName(item: (typeof response.result.items)[number]): string {
+              return (
+                item.matched_food?.name ??
+                (item.brand
+                  ? item.food_name
+                    ? `${item.brand} ${titleCase(item.food_name)}`
+                    : item.brand
+                  : titleCase(item.food_name))
+              );
+            }
+
+            function needsReview(item: (typeof response.result.items)[number]): boolean {
+              return Boolean(item.unconfirmed_food || (item.error && needsEstimate(item.error)));
+            }
+
+            // Keep each item's original index (needed for estimates[j] /
+            // setItemEstimate keying) while splitting into two groups so
+            // resolved items always render first, then the reviewable ones
+            // — instead of interleaved in whatever order the server
+            // returned them.
+            const indexed = response.result.items.map((item, j) => ({ item, j }));
+            const resolved = indexed.filter(({ item }) => !needsReview(item));
+            const pending = indexed.filter(({ item }) => needsReview(item));
+
             return (
               <View key={i} style={[styles.bubble, styles.assistantBubble, { maxWidth: '100%' }]}>
-                <Text style={styles.assistantIntro}>
-                  {response.needs_clarification
-                    ? 'I need a bit more info on some of these — resolved items can still be logged:'
-                    : "Here's what I found:"}
-                </Text>
-                <View style={{ gap: 16, marginTop: 8 }}>
-                  {response.result.items.map((item, j) => (
-                    <View key={j} style={styles.itemRow}>
-                      <Text style={styles.itemName}>{item.matched_food?.name ?? titleCase(item.food_name)}</Text>
-                      {item.unconfirmed_food && (
-                        <View style={styles.estimateCard}>
-                          <EstimateFoodForm
-                            foodName={item.food_name}
-                            estimate={estimates[j] ?? null}
-                            onEstimateChange={(e) => setItemEstimate(i, j, e)}
-                            externalMatch={item.unconfirmed_food}
-                          />
-                        </View>
-                      )}
-                      {!item.unconfirmed_food && item.error && needsEstimate(item.error) && (
-                        <View style={styles.estimateCard}>
-                          <EstimateFoodForm
-                            foodName={item.food_name}
-                            estimate={estimates[j] ?? null}
-                            onEstimateChange={(e) => setItemEstimate(i, j, e)}
-                          />
-                        </View>
-                      )}
-                      {!item.unconfirmed_food && item.error && !needsEstimate(item.error) && (
-                        <Text style={styles.errorText}>{item.error}</Text>
-                      )}
-                      {item.ambiguous && (
-                        <Text style={styles.warningText}>
-                          did you mean: {item.candidates?.map((c) => c.name).join(', ')}?
-                        </Text>
-                      )}
-                      {item.nutrition && <NutritionTags nutrition={item.nutrition} trackedMacros={trackedMacros} />}
+                {resolved.length > 0 && (
+                  <>
+                    <Text style={styles.assistantIntro}>Here's what I found:</Text>
+                    <View style={{ gap: 16, marginTop: 8 }}>
+                    {resolved.map(({ item, j }) => (
+                      <View key={j} style={styles.itemRow}>
+                        <Text style={styles.itemName}>{itemDisplayName(item)}</Text>
+                        {item.error && (
+                          <Text style={styles.errorText}>{item.error}</Text>
+                        )}
+                        {item.ambiguous && (
+                          <Text style={styles.warningText}>
+                            did you mean: {item.candidates?.map((c) => c.name).join(', ')}?
+                          </Text>
+                        )}
+                        {item.nutrition && <NutritionTags nutrition={item.nutrition} trackedMacros={trackedMacros} />}
+                      </View>
+                    ))}
                     </View>
-                  ))}
-                </View>
+                  </>
+                )}
+                {pending.length > 0 && (
+                  <>
+                    <Text style={[styles.assistantIntro, { marginTop: resolved.length > 0 ? 12 : 0 }]}>
+                      I need a bit more info on some of these:
+                    </Text>
+                    <View style={{ gap: 16, marginTop: 8 }}>
+                      {pending.map(({ item, j }) => (
+                        <View key={j} style={styles.itemRow}>
+                          <View style={styles.estimateCard}>
+                            <Text style={styles.itemName}>{itemDisplayName(item)}</Text>
+                            <EstimateFoodForm
+                              foodName={item.food_name}
+                              estimate={estimates[j] ?? null}
+                              onEstimateChange={(e) => setItemEstimate(i, j, e)}
+                              externalMatch={item.unconfirmed_food}
+                            />
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
                 <Text style={styles.totalText}>
                   Total: {Math.round(response.result.total.calories)} cal,{' '}
                   {response.result.total.protein.toFixed(1)}g protein
@@ -357,6 +385,7 @@ const styles = StyleSheet.create({
     borderColor: colors.divider,
     padding: 10,
     marginTop: 2,
+    gap: 6,
   },
   itemName: { fontFamily: fonts.heading, fontSize: 14, color: colors.text },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0392b' },
