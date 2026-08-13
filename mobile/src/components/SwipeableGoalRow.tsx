@@ -30,9 +30,13 @@ export default function SwipeableGoalRow({ children, toggle }: { children: React
     })
   ).current;
 
+  const toggleTranslateX = Animated.add(translateX, REVEAL_WIDTH);
+
   return (
     <View style={styles.container}>
-      <View style={styles.togglePane}>{toggle}</View>
+      <Animated.View style={[styles.togglePane, { transform: [{ translateX: toggleTranslateX }] }]}>
+        {toggle}
+      </Animated.View>
       <Animated.View
         style={[styles.foreground, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
