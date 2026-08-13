@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { colors } from '../theme';
 
-const REVEAL_WIDTH = 76;
+const REVEAL_WIDTH = 64;
 
 export default function SwipeableGoalRow({ children, toggle }: { children: React.ReactNode; toggle: React.ReactNode }) {
   const translateX = useRef(new Animated.Value(0)).current;
@@ -48,7 +48,7 @@ export default function SwipeableGoalRow({ children, toggle }: { children: React
 }
 
 const styles = StyleSheet.create({
-  container: { position: 'relative', overflow: 'hidden' },
+  container: { position: 'relative', overflow: 'hidden', width: '100%' },
   togglePane: {
     position: 'absolute',
     right: 0,
