@@ -18,11 +18,7 @@ const WEEKDAY_LABELS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const WEEK_PAGER_CENTER = 1;
 
 export default function HistoryScreen({ focused }: { focused: boolean }) {
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return dateKey(yesterday);
-  });
+  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);

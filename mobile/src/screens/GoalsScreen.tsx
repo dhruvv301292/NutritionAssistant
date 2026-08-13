@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
-  kicker: { fontSize: 14, fontFamily: fonts.heading, color: colors.text, marginBottom: 10 },
+  kicker: { fontSize: 19, fontFamily: fonts.heading, color: colors.text, marginBottom: 10 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14, marginBottom: 12 },
   field: { gap: 6 },
   toggleRow: {

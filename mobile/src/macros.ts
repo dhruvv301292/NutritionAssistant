@@ -1,10 +1,10 @@
 import { colors } from './theme';
 import type { Goals, Nutrition, TrackedMacro } from './types/api';
 
-// FDA/AHA general daily sodium guideline (2300mg) — sodium has no
+// AHA's stricter recommended sodium limit (2000mg) — sodium has no
 // user-settable goal (see GoalsScreen), so this is a fixed reference bar
 // rather than something the user can customize.
-export const SODIUM_REFERENCE_MG = 2300;
+export const SODIUM_REFERENCE_MG = 2000;
 
 type NumericGoalKey = 'calorie_goal' | 'protein_goal' | 'carb_goal' | 'fat_goal' | 'fiber_goal';
 
