@@ -276,6 +276,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                               estimate={estimates[j] ?? null}
                               onEstimateChange={(e) => setItemEstimate(i, j, e)}
                               externalMatch={item.unconfirmed_food}
+                              trackedMacros={trackedMacros}
                             />
                           </View>
                         </View>

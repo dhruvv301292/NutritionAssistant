@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { estimateFood } from '../api/client';
 import { colors, fonts, radius } from '../theme';
-import type { Food, NutritionEstimate } from '../types/api';
+import type { Food, NutritionEstimate, TrackedMacro } from '../types/api';
 
 export const NOT_MATCHED_ERROR = 'no matching food found';
 
@@ -22,16 +22,18 @@ type Props = {
   // rather than a total miss — pre-fills the edit form instead of
   // requiring a separate "suggest values with AI" step.
   externalMatch?: Food;
+  trackedMacros?: TrackedMacro[];
 };
 
-type FieldKey = keyof Pick<NutritionEstimate, 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber'>;
+type FieldKey = keyof Pick<NutritionEstimate, 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sodium'>;
 
-const FIELDS: { key: FieldKey; label: string }[] = [
+const BASE_FIELDS: { key: FieldKey; label: string; macro?: TrackedMacro }[] = [
   { key: 'calories', label: 'Calories' },
-  { key: 'protein', label: 'Protein (g)' },
-  { key: 'carbs', label: 'Carbs (g)' },
-  { key: 'fat', label: 'Fat (g)' },
-  { key: 'fiber', label: 'Fiber (g)' },
+  { key: 'protein', label: 'Protein (g)', macro: 'protein' },
+  { key: 'carbs', label: 'Carbs (g)', macro: 'carbs' },
+  { key: 'fat', label: 'Fat (g)', macro: 'fat' },
+  { key: 'fiber', label: 'Fiber (g)', macro: 'fiber' },
+  { key: 'sodium', label: 'Sodium (mg)', macro: 'sodium' },
 ];
 
 function toEstimate(food: Food): NutritionEstimate {
@@ -48,9 +50,10 @@ function toEstimate(food: Food): NutritionEstimate {
   };
 }
 
-export default function EstimateFoodForm({ foodName, estimate, onEstimateChange, externalMatch }: Props) {
+export default function EstimateFoodForm({ foodName, estimate, onEstimateChange, externalMatch, trackedMacros }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const FIELDS = BASE_FIELDS.filter((f) => !f.macro || !trackedMacros || trackedMacros.includes(f.macro));
 
   // externalMatch arrives already resolved (from the chat response), so
   // seed the parent's estimate state with it as soon as this item shows up
