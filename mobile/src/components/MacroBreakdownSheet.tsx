@@ -16,19 +16,26 @@ type Props = {
   meals: MealLog[];
 };
 
-function mealMacroTotal(meal: MealLog, macroKey: MacroKey): number {
-  return meal.items.reduce((sum, item) => sum + (item.nutrition?.[macroKey] ?? 0), 0);
+function itemName(item: MealLog['items'][number]): string {
+  return item.food?.name ?? `food #${item.food_id}`;
 }
 
-function mealName(meal: MealLog): string {
-  return meal.items.map((i) => i.food?.name ?? `food #${i.food_id}`).join(', ');
+type ItemRow = { key: string; name: string; time: string; value: number };
+
+function itemRows(meals: MealLog[], macroKey: MacroKey): ItemRow[] {
+  const rows: ItemRow[] = [];
+  for (const meal of meals) {
+    for (const item of meal.items) {
+      const value = item.nutrition?.[macroKey] ?? 0;
+      if (value <= 0) continue;
+      rows.push({ key: `${meal.id}-${item.id}`, name: itemName(item), time: formatTime(meal.logged_at), value });
+    }
+  }
+  return rows.sort((a, b) => b.value - a.value);
 }
 
 export default function MacroBreakdownSheet({ visible, onClose, label, macroKey, unit, total, color, meals }: Props) {
-  const rows = meals
-    .map((meal) => ({ meal, value: mealMacroTotal(meal, macroKey) }))
-    .filter((row) => row.value > 0)
-    .sort((a, b) => b.value - a.value);
+  const rows = itemRows(meals, macroKey);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -43,14 +50,14 @@ export default function MacroBreakdownSheet({ visible, onClose, label, macroKey,
 
         <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
           {rows.length === 0 && <Text style={styles.emptyText}>Nothing logged yet.</Text>}
-          {rows.map(({ meal, value }) => (
-            <View key={meal.id} style={styles.row}>
+          {rows.map((row) => (
+            <View key={row.key} style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.mealName}>{mealName(meal)}</Text>
-                <Text style={styles.mealTime}>{formatTime(meal.logged_at)}</Text>
+                <Text style={styles.mealName}>{row.name}</Text>
+                <Text style={styles.mealTime}>{row.time}</Text>
               </View>
               <Text style={[styles.mealValue, { color }]}>
-                {Math.round(value)}
+                {Math.round(row.value)}
                 {unit}
               </Text>
             </View>

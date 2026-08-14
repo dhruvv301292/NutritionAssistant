@@ -11,6 +11,19 @@ export type MacroDef = {
   goalKey: NumericGoalKey;
 };
 
+// Same shape as MacroDef but for calories, which aren't toggleable/tracked
+// like the others — kept separate so CaloriesCard can open
+// MacroBreakdownSheet the same way MacroTile does.
+export type CaloriesDef = { key: 'calories'; label: string; color: string; unit: string; goalKey: 'calorie_goal' };
+
+export const CALORIES_MACRO: CaloriesDef = {
+  key: 'calories',
+  label: 'CALORIES',
+  color: colors.accent500,
+  unit: ' kcal',
+  goalKey: 'calorie_goal',
+};
+
 // Single source of truth for every macro's display metadata, used by
 // GoalsScreen (toggles + stepper fields), TodayScreen/HistoryScreen
 // (tiles), and NutritionTags (chat log tags) — previously duplicated as a

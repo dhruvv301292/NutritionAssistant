@@ -7,12 +7,11 @@ import AccountButton from '../components/AccountButton';
 import CaloriesCard from '../components/CaloriesCard';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
-import NutritionTags from '../components/NutritionTags';
-import { MacroDef, macroGoal, trackedMacroDefs } from '../macros';
-import { colors, fonts, radius, shadow } from '../theme';
-import { dateKey, formatTime, startOfWeek, weekDates } from '../dateUtils';
-import { SLOT_LABEL, SLOT_ORDER } from '../slots';
-import type { DailySummary, Goals, MealLog, Nutrition } from '../types/api';
+import MealsBySlot from '../components/MealsBySlot';
+import { CALORIES_MACRO, CaloriesDef, MacroDef, macroGoal, trackedMacroDefs } from '../macros';
+import { colors, fonts, radius } from '../theme';
+import { dateKey, startOfWeek, weekDates } from '../dateUtils';
+import type { DailySummary, Goals } from '../types/api';
 
 const WEEKDAY_LABELS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const WEEK_PAGER_CENTER = 1;
@@ -23,7 +22,7 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMacro, setActiveMacro] = useState<MacroDef | null>(null);
+  const [activeMacro, setActiveMacro] = useState<MacroDef | CaloriesDef | null>(null);
   const weekPagerRef = useRef<PagerView>(null);
 
   const load = useCallback((date: string) => {
@@ -69,8 +68,6 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
     d.setDate(d.getDate() + offset);
     return weekDates(d);
   });
-
-  const mealsBySlot = groupBySlot(summary?.meals ?? []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -129,7 +126,11 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
         {!error && (!summary || !goals) && <ActivityIndicator color={colors.accent700} />}
         {summary && goals && (
           <>
-            <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
+            <CaloriesCard
+              calories={Math.round(summary.total.calories)}
+              goal={goals.calorie_goal}
+              onPress={() => setActiveMacro(CALORIES_MACRO)}
+            />
             <View style={[styles.tileGrid, { marginBottom: 18 }]}>
               {trackedMacroDefs(goals.tracked_macros).map((m) => (
                 <MacroTile
@@ -144,25 +145,7 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
               ))}
             </View>
 
-            {SLOT_ORDER.map((slot) => (
-              <View key={slot} style={{ marginBottom: 18 }}>
-                <Text style={styles.kicker}>{SLOT_LABEL[slot]}</Text>
-                {(mealsBySlot[slot] ?? []).length === 0 && (
-                  <Text style={styles.emptyText}>Nothing logged yet.</Text>
-                )}
-                {(mealsBySlot[slot] ?? []).map((meal) => (
-                  <View key={meal.id} style={[styles.mealCard, shadow.sm]}>
-                    <View style={styles.mealHeaderRow}>
-                      <Text style={styles.mealName}>
-                        {meal.items.map((i) => i.food?.name ?? `food #${i.food_id}`).join(', ')}
-                      </Text>
-                      <Text style={styles.mealTime}>{formatTime(meal.logged_at)}</Text>
-                    </View>
-                    <NutritionTags nutrition={sumMealNutrition(meal)} trackedMacros={goals.tracked_macros} />
-                  </View>
-                ))}
-              </View>
-            ))}
+            <MealsBySlot meals={summary.meals} trackedMacros={goals.tracked_macros} />
           </>
         )}
       </ScrollView>
@@ -181,30 +164,6 @@ export default function HistoryScreen({ focused }: { focused: boolean }) {
       )}
     </SafeAreaView>
   );
-}
-
-function sumMealNutrition(meal: MealLog): Nutrition {
-  const total: Nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 };
-  for (const item of meal.items) {
-    if (!item.nutrition) continue;
-    total.calories += item.nutrition.calories;
-    total.protein += item.nutrition.protein;
-    total.carbs += item.nutrition.carbs;
-    total.fat += item.nutrition.fat;
-    total.fiber += item.nutrition.fiber;
-    total.sodium += item.nutrition.sodium;
-  }
-  return total;
-}
-
-function groupBySlot(meals: MealLog[]): Partial<Record<string, MealLog[]>> {
-  const result: Partial<Record<string, MealLog[]>> = {};
-  for (const meal of meals) {
-    const slot = meal.slot;
-    result[slot] = result[slot] ?? [];
-    result[slot]!.push(meal);
-  }
-  return result;
 }
 
 const styles = StyleSheet.create({
@@ -226,12 +185,6 @@ const styles = StyleSheet.create({
   dateNum: { fontFamily: fonts.heading, fontSize: 23 },
   dateNumDisabled: { color: colors.neutral500 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
-  kicker: { fontFamily: fonts.bodySemiBold, fontSize: 10, letterSpacing: 1, color: colors.accent, marginBottom: 8, textTransform: 'uppercase' },
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14 },
-  emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.text, opacity: 0.5 },
-  mealCard: { backgroundColor: colors.surface, borderRadius: 26, padding: 14, marginBottom: 10, gap: 8 },
-  mealHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  mealName: { fontFamily: fonts.heading, fontSize: 15, color: colors.text, flex: 1, marginRight: 8 },
-  mealTime: { fontFamily: fonts.body, fontSize: 12, color: colors.text, opacity: 0.5 },
 });

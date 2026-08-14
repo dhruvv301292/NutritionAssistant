@@ -8,7 +8,8 @@ import CaloriesCard from '../components/CaloriesCard';
 import LogMealSheet from '../components/LogMealSheet';
 import MacroBreakdownSheet from '../components/MacroBreakdownSheet';
 import MacroTile from '../components/MacroTile';
-import { MacroDef, macroGoal, trackedMacroDefs } from '../macros';
+import MealsBySlot from '../components/MealsBySlot';
+import { CALORIES_MACRO, CaloriesDef, MacroDef, macroGoal, trackedMacroDefs } from '../macros';
 import { colors, fonts, radius, shadow } from '../theme';
 import { dateKey, formatDateLabel } from '../dateUtils';
 import type { DailySummary, Goals } from '../types/api';
@@ -18,7 +19,7 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
   const [goals, setGoals] = useState<Goals | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeMacro, setActiveMacro] = useState<MacroDef | null>(null);
+  const [activeMacro, setActiveMacro] = useState<MacroDef | CaloriesDef | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -50,7 +51,11 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
         {!error && (!summary || !goals) && <ActivityIndicator color={colors.accent700} />}
         {summary && goals && (
           <>
-            <CaloriesCard calories={Math.round(summary.total.calories)} goal={goals.calorie_goal} />
+            <CaloriesCard
+              calories={Math.round(summary.total.calories)}
+              goal={goals.calorie_goal}
+              onPress={() => setActiveMacro(CALORIES_MACRO)}
+            />
             <View style={styles.tileGrid}>
               {trackedMacroDefs(goals.tracked_macros).map((m) => (
                 <MacroTile
@@ -64,6 +69,8 @@ export default function TodayScreen({ focused }: { focused: boolean }) {
                 />
               ))}
             </View>
+
+            <MealsBySlot meals={summary.meals} trackedMacros={goals.tracked_macros} />
           </>
         )}
       </ScrollView>
