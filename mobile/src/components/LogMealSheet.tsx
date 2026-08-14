@@ -34,6 +34,10 @@ type ChatEntry =
       response: ChatMealResponse;
       saved: boolean;
       saving: boolean;
+      // Slot the meal was actually logged under — captured at save time so
+      // the confirmation text stays accurate even if the picker changes
+      // afterward for the next message.
+      savedSlot: Slot | null;
       // Pending edits for items needing an estimate/review, keyed by item
       // index — lets "log this meal" save whatever's currently in each
       // form without a separate per-item save step.
@@ -87,7 +91,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
       const response = await chatMeal(text);
       setEntries((prev) => [
         ...prev,
-        { role: 'assistant', response, saved: false, saving: false, estimates: {} },
+        { role: 'assistant', response, saved: false, saving: false, savedSlot: null, estimates: {} },
       ]);
     } catch {
       setEntries((prev) => [...prev, { role: 'error', text: 'Could not reach the server.' }]);
@@ -132,7 +136,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
 
       await saveMeal(items, slot);
       setEntries((prev) =>
-        prev.map((e, i) => (i === index && e.role === 'assistant' ? { ...e, saved: true } : e))
+        prev.map((e, i) => (i === index && e.role === 'assistant' ? { ...e, saved: true, savedSlot: slot } : e))
       );
       onMealSaved();
     } catch {
@@ -289,7 +293,9 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                   {response.result.total.protein.toFixed(1)}g protein
                 </Text>
                 {saved ? (
-                  <Text style={styles.savedText}>meal logged</Text>
+                  <Text style={styles.savedText}>
+                    {(entry.savedSlot ? SLOT_LABEL[entry.savedSlot] : 'Meal')} logged
+                  </Text>
                 ) : (
                   <Pressable
                     style={[styles.logButton, saving && { opacity: 0.6 }]}
@@ -392,7 +398,7 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0392b' },
   warningText: { fontFamily: fonts.body, fontSize: 12, color: '#d68910' },
   totalText: { fontFamily: fonts.bodyBold, marginTop: 8, fontSize: 13, color: colors.text },
-  savedText: { fontFamily: fonts.bodySemiBold, color: colors.accent2_700, marginTop: 8, fontSize: 13 },
+  savedText: { fontFamily: fonts.bodySemiBold, color: colors.accent2_700, marginTop: 8, fontSize: 17 },
   logButton: {
     marginTop: 8,
     backgroundColor: colors.accent,
