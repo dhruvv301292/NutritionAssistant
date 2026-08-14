@@ -70,7 +70,7 @@ func main() {
 
 	mealRepo := meals.NewRepository(pool)
 	matcher := meals.NewMatcher(foodService, aiClient)
-	mealService := meals.NewService(mealRepo, matcher, foodService)
+	mealService := meals.NewService(mealRepo, matcher, foodService, aiClient)
 
 	goalsRepo := goals.NewRepository(pool)
 

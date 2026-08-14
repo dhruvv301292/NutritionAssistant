@@ -41,7 +41,11 @@ type Log struct {
 	UserID   int       `json:"user_id"`
 	LoggedAt time.Time `json:"logged_at"`
 	Slot     string    `json:"slot"`
-	Items    []LogItem `json:"items"`
+	// Title is a short fun name generated from the meal's ingredients at
+	// save time (e.g. "Whey Coke Float" for diet coke + whey protein) —
+	// nullable since older rows predate this column.
+	Title *string   `json:"title,omitempty"`
+	Items []LogItem `json:"items"`
 }
 
 type LogItem struct {

@@ -70,6 +70,7 @@ export type MealLog = {
   user_id: number;
   logged_at: string;
   slot: Slot;
+  title?: string;
   items: LogItem[];
 };
 

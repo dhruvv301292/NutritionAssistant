@@ -13,14 +13,22 @@ import (
 var ErrUnresolvedItems = errors.New("one or more items could not be resolved")
 var ErrInvalidSlot = errors.New("slot must be one of breakfast, lunch, dinner, snack")
 
+// titleGenerator is the subset of ai.Client Save depends on for the fun
+// meal-title feature. Defined here so tests can fake it, same pattern as
+// searcher/brandVerifier in matcher.go.
+type titleGenerator interface {
+	GenerateMealTitle(ctx context.Context, ingredients []string) (string, error)
+}
+
 type Service struct {
 	repo        *Repository
 	matcher     *Matcher
 	foodService *foods.Service
+	titleGen    titleGenerator
 }
 
-func NewService(repo *Repository, matcher *Matcher, foodService *foods.Service) *Service {
-	return &Service{repo: repo, matcher: matcher, foodService: foodService}
+func NewService(repo *Repository, matcher *Matcher, foodService *foods.Service, titleGen titleGenerator) *Service {
+	return &Service{repo: repo, matcher: matcher, foodService: foodService, titleGen: titleGen}
 }
 
 func (s *Service) Calculate(ctx context.Context, items []ItemRequest) CalculateResponse {
@@ -53,6 +61,7 @@ func (s *Service) Save(ctx context.Context, userID int, slot string, items []Ite
 	results := s.matcher.ResolveItems(ctx, items)
 
 	logItems := make([]LogItem, 0, len(results))
+	ingredients := make([]string, 0, len(results))
 	for i, r := range results {
 		if r.Error != "" || r.Ambiguous || r.MatchedFood == nil {
 			return Log{}, results, ErrUnresolvedItems
@@ -62,9 +71,21 @@ func (s *Service) Save(ctx context.Context, userID int, slot string, items []Ite
 			Quantity: items[i].Quantity,
 			Unit:     items[i].Unit,
 		})
+		ingredients = append(ingredients, r.MatchedFood.Name)
 	}
 
-	log, err := s.repo.Save(ctx, userID, slot, logItems)
+	// Title generation is best-effort cosmetic flair, not part of the
+	// nutrition pipeline's correctness — a failure here (rate limit, API
+	// hiccup) must never block saving the actual meal, so errors are
+	// swallowed and the meal is just saved without a title.
+	var title *string
+	if s.titleGen != nil {
+		if t, err := s.titleGen.GenerateMealTitle(ctx, ingredients); err == nil && t != "" {
+			title = &t
+		}
+	}
+
+	log, err := s.repo.Save(ctx, userID, slot, title, logItems)
 	if err != nil {
 		return Log{}, nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 )
@@ -12,6 +13,7 @@ import (
 const parseMealToolName = "record_meal_items"
 const estimateNutritionToolName = "record_nutrition_estimate"
 const verifyBrandMatchToolName = "record_brand_match_verdict"
+const generateMealTitleToolName = "record_meal_title"
 
 var errNoToolUse = errors.New("model did not return a tool_use block")
 
@@ -190,6 +192,51 @@ func withBrand(estimate NutritionEstimate, brand string) NutritionEstimate {
 		estimate.Brand = &brand
 	}
 	return estimate
+}
+
+// GenerateMealTitle comes up with a short, fun name for a logged meal based
+// on its ingredient list (e.g. "diet coke, whey protein powder" -> "Whey
+// Coke Float"). Purely cosmetic — never affects matching, calculation, or
+// anything else in the nutrition pipeline — so a forced-schema Haiku call
+// is enough, same tier as VerifyBrandMatch.
+func (c *Client) GenerateMealTitle(ctx context.Context, ingredients []string) (string, error) {
+	tool := anthropic.ToolUnionParamOfTool(anthropic.ToolInputSchemaParam{
+		Properties: map[string]any{
+			"title": map[string]any{"type": "string", "description": "a short, fun, punny title (2-5 words) for a meal made of these ingredients — playful, not literal, no quotes around it"},
+		},
+		Required: []string{"title"},
+	}, generateMealTitleToolName)
+
+	prompt := "Ingredients: " + strings.Join(ingredients, ", ") +
+		"\n\nCome up with a short, fun title for this meal."
+
+	message, err := c.anthropic.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:      anthropic.ModelClaudeHaiku4_5,
+		MaxTokens:  256,
+		ToolChoice: anthropic.ToolChoiceParamOfTool(generateMealTitleToolName),
+		Tools:      []anthropic.ToolUnionParam{tool},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("anthropic request failed: %w", err)
+	}
+
+	for _, block := range message.Content {
+		if block.Type != "tool_use" || block.Name != generateMealTitleToolName {
+			continue
+		}
+		var result struct {
+			Title string `json:"title"`
+		}
+		if err := json.Unmarshal(block.Input, &result); err != nil {
+			return "", fmt.Errorf("failed to decode tool_use input: %w", err)
+		}
+		return result.Title, nil
+	}
+
+	return "", errNoToolUse
 }
 
 // VerifyBrandMatch asks the model whether a candidate database row is the
