@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getGoals, putGoals } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import AccountButton from '../components/AccountButton';
-import SwipeableGoalRow from '../components/SwipeableGoalRow';
 import { MACROS } from '../macros';
 import { colors, fonts, radius } from '../theme';
 import type { Goals, TrackedMacro } from '../types/api';
@@ -77,8 +76,12 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
           <>
             <Text style={styles.kicker}>Daily targets and limits</Text>
             <View style={{ gap: 12, marginBottom: 22 }}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Calories (kcal)</Text>
+              <View style={[styles.field, styles.fieldCard]}>
+                <View style={styles.fieldHeaderRow}>
+                  <View style={styles.toggleSlot} />
+                  <Text style={[styles.fieldLabel, styles.fieldLabelCentered]}>Calories (kcal)</Text>
+                  <View style={styles.toggleSlot} />
+                </View>
                 <View style={styles.stepperRow}>
                   <Pressable style={styles.stepperButton} onPress={() => adjust('calorie_goal', -STEP.calorie_goal)}>
                     <Text style={styles.stepperButtonText}>−</Text>
@@ -92,42 +95,48 @@ export default function GoalsScreen({ focused }: { focused: boolean }) {
                   </Pressable>
                 </View>
               </View>
-              {MACROS.map((m) => {
+              {[...MACROS]
+                .sort((a, b) => {
+                  const aOn = goals.tracked_macros.includes(a.key);
+                  const bOn = goals.tracked_macros.includes(b.key);
+                  return aOn === bOn ? 0 : aOn ? -1 : 1;
+                })
+                .map((m) => {
                 const on = goals.tracked_macros.includes(m.key);
                 return (
-                  <SwipeableGoalRow
-                    key={m.key}
-                    toggle={
-                      <Switch
-                        value={on}
-                        onValueChange={() => toggleMacro(m.key)}
-                        trackColor={{ true: colors.accent }}
-                      />
-                    }
-                  >
-                    <View style={styles.field}>
-                      <Text style={styles.fieldLabel}>
+                  <View key={m.key} style={[styles.field, styles.fieldCard]}>
+                    <View style={styles.fieldHeaderRow}>
+                      <View style={styles.toggleSlot}>
+                        <Switch
+                          style={styles.toggleSmall}
+                          value={on}
+                          onValueChange={() => toggleMacro(m.key)}
+                          trackColor={{ true: colors.accent }}
+                        />
+                      </View>
+                      <Text style={[styles.fieldLabel, styles.fieldLabelCentered]}>
                         {m.label.charAt(0) + m.label.slice(1).toLowerCase()} ({m.unit})
                       </Text>
-                      <View style={styles.stepperRow}>
-                        <Pressable
-                          style={[styles.stepperButton, !on && styles.stepperButtonDisabled]}
-                          disabled={!on}
-                          onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
-                        >
-                          <Text style={[styles.stepperButtonText, !on && styles.stepperButtonTextDisabled]}>−</Text>
-                        </Pressable>
-                        <Text style={[styles.stepperValue, !on && styles.stepperValueDisabled]}>{goals[m.goalKey]}</Text>
-                        <Pressable
-                          style={[styles.stepperButton, styles.stepperButtonPrimary, !on && styles.stepperButtonDisabled]}
-                          disabled={!on}
-                          onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
-                        >
-                          <Text style={[styles.stepperButtonText, { color: colors.bg }, !on && styles.stepperButtonTextDisabled]}>+</Text>
-                        </Pressable>
-                      </View>
+                      <View style={styles.toggleSlot} />
                     </View>
-                  </SwipeableGoalRow>
+                    <View style={styles.stepperRow}>
+                      <Pressable
+                        style={[styles.stepperButton, !on && styles.stepperButtonDisabled]}
+                        disabled={!on}
+                        onPress={() => adjust(m.goalKey, -STEP[m.goalKey])}
+                      >
+                        <Text style={[styles.stepperButtonText, !on && styles.stepperButtonTextDisabled]}>−</Text>
+                      </Pressable>
+                      <Text style={[styles.stepperValue, !on && styles.stepperValueDisabled]}>{goals[m.goalKey]}</Text>
+                      <Pressable
+                        style={[styles.stepperButton, styles.stepperButtonPrimary, !on && styles.stepperButtonDisabled]}
+                        disabled={!on}
+                        onPress={() => adjust(m.goalKey, STEP[m.goalKey])}
+                      >
+                        <Text style={[styles.stepperButtonText, { color: colors.bg }, !on && styles.stepperButtonTextDisabled]}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 );
               })}
             </View>
@@ -155,17 +164,23 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: fonts.heading, fontSize: 30, color: colors.text },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
-  kicker: { fontSize: 19, fontFamily: fonts.heading, color: colors.text, marginBottom: 10 },
+  kicker: { fontSize: 19, fontFamily: fonts.body, fontWeight: '400', color: colors.text, marginBottom: 10 },
   errorText: { fontFamily: fonts.body, color: '#c0392b', fontSize: 14, marginBottom: 12 },
-  field: { gap: 6 },
-  toggleRow: {
+  field: { gap: 10 },
+  fieldCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: 14,
+  },
+  fieldHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+    gap: 8,
   },
-  toggleLabel: { fontFamily: fonts.body, fontSize: 15, color: colors.text },
-  fieldLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.text, opacity: 0.7 },
+  fieldLabel: { fontFamily: fonts.body, fontSize: 16, color: colors.text, opacity: 0.85 },
+  fieldLabelCentered: { flex: 1, textAlign: 'center' },
+  toggleSlot: { width: 38, alignItems: 'flex-start', justifyContent: 'center' },
+  toggleSmall: { transform: [{ translateX: -13 }, { scale: 0.5 }] },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepperButton: {
     width: 38,
