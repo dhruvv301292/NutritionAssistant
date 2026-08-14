@@ -27,6 +27,32 @@ function titleCase(s: string): string {
   return s.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1));
 }
 
+// Mirrors the backend's nutrition.CalculateNutrition scaling
+// (stored_value / unit_quantity * consumed_quantity) so the displayed
+// total reflects what will actually be logged — including items still
+// pending an estimate, which response.result.total never accounts for
+// since it was computed before any estimate existed.
+function estimateTotal(
+  response: ChatMealResponse,
+  estimates: Record<number, NutritionEstimate>
+): { calories: number; protein: number } {
+  let calories = 0;
+  let protein = 0;
+  response.result.items.forEach((item, j) => {
+    if (item.nutrition) {
+      calories += item.nutrition.calories;
+      protein += item.nutrition.protein;
+      return;
+    }
+    const est = estimates[j];
+    if (!est || est.unitquantity <= 0 || est.unit !== item.unit) return;
+    const factor = item.quantity / est.unitquantity;
+    calories += est.calories * factor;
+    protein += est.protein * factor;
+  });
+  return { calories, protein };
+}
+
 type ChatEntry =
   | { role: 'user'; text: string }
   | {
@@ -295,8 +321,10 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                   </>
                 )}
                 <Text style={styles.totalText}>
-                  Total: {Math.round(response.result.total.calories)} cal,{' '}
-                  {response.result.total.protein.toFixed(1)}g protein
+                  {(() => {
+                    const total = estimateTotal(response, estimates);
+                    return `Total: ${Math.round(total.calories)} cal, ${total.protein.toFixed(1)}g protein`;
+                  })()}
                 </Text>
                 {saved ? (
                   <Text style={styles.savedText}>
