@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
-	"os"
-	"strings"
 	"github.com/dhruvv301292/nutrichat/internal/ai"
 	"github.com/dhruvv301292/nutrichat/internal/api"
 	"github.com/dhruvv301292/nutrichat/internal/auth"
@@ -14,8 +11,11 @@ import (
 	"github.com/dhruvv301292/nutrichat/internal/meals"
 	"github.com/dhruvv301292/nutrichat/internal/users"
 	"github.com/go-chi/chi/v5"
-	"net/http"
 	"github.com/joho/godotenv"
+	"log"
+	"net/http"
+	"os"
+	"strings"
 )
 
 // aiEstimatorProvider adapts ai.Client.EstimateNutrition to foods.Service's
@@ -40,15 +40,16 @@ func (p aiEstimatorProvider) Lookup(ctx context.Context, query string) (*foods.E
 		return nil, err
 	}
 	return &foods.ExternalResult{
-		Name:         estimate.Name,
-		Calories:     estimate.Calories,
-		Protein:      estimate.Protein,
-		Carbs:        estimate.Carbs,
-		Fat:          estimate.Fat,
-		Fiber:        estimate.Fiber,
-		Sodium:       estimate.Sodium,
-		Unit:         estimate.Unit,
-		UnitQuantity: estimate.UnitQuantity,
+		Name:            estimate.Name,
+		Calories:        estimate.Calories,
+		Protein:         estimate.Protein,
+		Carbs:           estimate.Carbs,
+		Fat:             estimate.Fat,
+		Fiber:           estimate.Fiber,
+		Sodium:          estimate.Sodium,
+		Unit:            estimate.Unit,
+		UnitQuantity:    estimate.UnitQuantity,
+		GramsPerServing: estimate.GramsPerUnit,
 	}, nil
 }
 

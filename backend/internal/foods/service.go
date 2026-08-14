@@ -141,10 +141,20 @@ func (s *Service) FetchExternal(ctx context.Context, query, brand string) *nutri
 		case result.GramsPerServing != nil:
 			food.Unit = "count"
 			food.UnitQuantity = 1
-			food.GramsPerUnit = result.GramsPerServing
 		default:
 			food.Unit = "grams"
 			food.UnitQuantity = 100
+		}
+		// GramsPerUnit is independent of which basis (Unit/UnitQuantity) the
+		// values above are expressed on — a food can be reported per-100g
+		// AND still have a known per-piece weight (e.g. one slice of bread
+		// ≈ 40g even though macros are given per 100g). The switch above
+		// only picks Unit/UnitQuantity; this must always run when the
+		// provider supplied a per-piece weight, or it's silently dropped
+		// whenever result.Unit is set (which it always is from the AI
+		// estimator — see EstimateNutrition's grams_per_unit field).
+		if result.GramsPerServing != nil {
+			food.GramsPerUnit = result.GramsPerServing
 		}
 		return &food
 	}
