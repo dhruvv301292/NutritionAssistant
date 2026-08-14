@@ -111,7 +111,7 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName, brand string) 
 			"sodium":         map[string]any{"type": "number", "description": "milligrams"},
 			"unit":           map[string]any{"type": "string", "enum": []string{"grams", "count"}, "description": "grams for a 100g basis, count for a discrete item/serving/package"},
 			"unitquantity":   map[string]any{"type": "number", "description": "must be exactly 100 when unit is \"grams\". When unit is \"count\", this is how many individual pieces the values below cover — use the food's REAL official serving/package size (e.g. 8 for an \"8 piece\" nugget order, 12 for a \"12 piece\", 30 for a \"30 piece\"), never force it to 1 for a multi-piece food. Only use 1 when the food is naturally a single discrete unit (one egg, one bar, one can). Never 0."},
-			"grams_per_unit": map[string]any{"type": "number", "description": "ONLY when unit is \"count\": your best estimate of how many grams a SINGLE one of that count-based unit weighs (e.g. one slice of bread ≈ 40, one egg ≈ 50, one nugget ≈ 16). Omit entirely when unit is \"grams\"."},
+			"grams_per_unit": map[string]any{"type": "number", "description": "Your best estimate of how many grams a SINGLE discrete piece of this food weighs (e.g. one slice of bread ≈ 40, one egg ≈ 50, one nugget ≈ 16) — provide this whenever the food is naturally eaten/counted as discrete pieces/slices/items, REGARDLESS of whether you chose \"grams\" or \"count\" for the unit field above. Only omit entirely for foods with no natural discrete-piece size (a scoop of rice, a pool of sauce, a puddle of oil)."},
 		},
 		Required: []string{"name", "calories", "protein", "carbs", "fat", "fiber", "sodium", "unit", "unitquantity"},
 	}, estimateNutritionToolName)
