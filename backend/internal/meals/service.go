@@ -71,25 +71,35 @@ func (s *Service) Save(ctx context.Context, userID int, slot string, items []Ite
 	return log, nil, nil
 }
 
-func (s *Service) Today(ctx context.Context, userID int) ([]Log, error) {
-	now := time.Now().UTC()
-	start := now.Format("2006-01-02")
-	end := now.AddDate(0, 0, 1).Format("2006-01-02")
-	logs, err := s.repo.ListByUserAndDateRange(ctx, userID, start, end)
+// tzOffsetMinutes follows JS Date.getTimezoneOffset() convention: minutes
+// the local zone is BEHIND UTC (e.g. UTC-5 => +300). Subtracting it from a
+// UTC instant converts to local wall-clock time, and adding it converts back.
+func (s *Service) Today(ctx context.Context, userID int, tzOffsetMinutes int) ([]Log, error) {
+	localNow := time.Now().UTC().Add(-time.Duration(tzOffsetMinutes) * time.Minute)
+	localDate := localNow.Format("2006-01-02")
+	logs, err := s.dailySummaryLogs(ctx, userID, localDate, tzOffsetMinutes)
 	if err != nil {
 		return nil, err
 	}
 	return s.hydrate(ctx, logs)
 }
 
-func (s *Service) DailySummary(ctx context.Context, userID int, date string) (DailySummary, error) {
-	start, err := time.Parse("2006-01-02", date)
+func (s *Service) dailySummaryLogs(ctx context.Context, userID int, date string, tzOffsetMinutes int) ([]Log, error) {
+	localStart, err := time.Parse("2006-01-02", date)
 	if err != nil {
-		return DailySummary{}, fmt.Errorf("invalid date %q, expected YYYY-MM-DD", date)
+		return nil, fmt.Errorf("invalid date %q, expected YYYY-MM-DD", date)
 	}
-	end := start.AddDate(0, 0, 1)
+	localEnd := localStart.AddDate(0, 0, 1)
 
-	logs, err := s.repo.ListByUserAndDateRange(ctx, userID, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	offset := time.Duration(tzOffsetMinutes) * time.Minute
+	utcStart := localStart.Add(offset)
+	utcEnd := localEnd.Add(offset)
+
+	return s.repo.ListByUserAndDateRange(ctx, userID, utcStart.Format("2006-01-02T15:04:05"), utcEnd.Format("2006-01-02T15:04:05"))
+}
+
+func (s *Service) DailySummary(ctx context.Context, userID int, date string, tzOffsetMinutes int) (DailySummary, error) {
+	logs, err := s.dailySummaryLogs(ctx, userID, date, tzOffsetMinutes)
 	if err != nil {
 		return DailySummary{}, err
 	}

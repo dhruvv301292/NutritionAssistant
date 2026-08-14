@@ -64,7 +64,11 @@ export function saveMeal(
 }
 
 export function dailySummary(date: string): Promise<DailySummary> {
-  return request(`/summary/daily?date=${date}`);
+  // Backend stores logged_at in UTC; tell it our local UTC offset (JS
+  // Date.getTimezoneOffset() convention) so "date" is interpreted as our
+  // local calendar day, not the server's UTC day.
+  const tzOffsetMinutes = new Date().getTimezoneOffset();
+  return request(`/summary/daily?date=${date}&tz_offset_minutes=${tzOffsetMinutes}`);
 }
 
 export function getGoals(): Promise<Goals> {

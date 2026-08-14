@@ -13,6 +13,7 @@ import (
 	"github.com/dhruvv301292/nutrichat/internal/users"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type Handler struct {
@@ -263,12 +264,28 @@ func (h *Handler) MealsToday(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthenticated", http.StatusUnauthorized)
 		return
 	}
-	logs, err := h.mealService.Today(r.Context(), userID)
+	logs, err := h.mealService.Today(r.Context(), userID, tzOffsetMinutes(r))
 	if err != nil {
 		http.Error(w, "failed to fetch meals", http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(logs)
+}
+
+// tzOffsetMinutes reads the client's local-vs-UTC offset (JS
+// Date.getTimezoneOffset() convention: minutes local is BEHIND UTC), so
+// "today"/daily-summary queries use the user's local calendar day instead
+// of the server's UTC day. Missing/invalid values default to UTC (0).
+func tzOffsetMinutes(r *http.Request) int {
+	raw := r.URL.Query().Get("tz_offset_minutes")
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 func (h *Handler) DailySummary(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +300,7 @@ func (h *Handler) DailySummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "date query parameter is required (YYYY-MM-DD)", http.StatusBadRequest)
 		return
 	}
-	summary, err := h.mealService.DailySummary(r.Context(), userID, date)
+	summary, err := h.mealService.DailySummary(r.Context(), userID, date, tzOffsetMinutes(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
