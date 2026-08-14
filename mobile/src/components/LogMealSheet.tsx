@@ -27,6 +27,29 @@ function titleCase(s: string): string {
   return s.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1));
 }
 
+const GRAMS_PER_OUNCE = 28.3495;
+
+// Mirrors the backend's nutrition.ConvertToGrams — converts a logged
+// quantity/unit into whatever basis the estimate is expressed in, trying
+// grams_per_unit before falling back to an exact unit match. Returns null
+// when the units are genuinely incompatible (no way to convert), same as
+// the backend's error case.
+function convertToEstimateBasis(quantity: number, unit: string, est: NutritionEstimate): number | null {
+  if (est.unit === 'grams') {
+    if (unit === 'grams') return quantity;
+    if (unit === 'ounces') return quantity * GRAMS_PER_OUNCE;
+    if (unit === 'count' && est.grams_per_unit) return quantity * est.grams_per_unit;
+    return null;
+  }
+  if (est.grams_per_unit) {
+    if (unit === est.unit) return quantity;
+    if (unit === 'grams') return quantity / est.grams_per_unit;
+    if (unit === 'ounces') return (quantity * GRAMS_PER_OUNCE) / est.grams_per_unit;
+    return null;
+  }
+  return unit === est.unit ? quantity : null;
+}
+
 // Mirrors the backend's nutrition.CalculateNutrition scaling
 // (stored_value / unit_quantity * consumed_quantity) so the displayed
 // total reflects what will actually be logged — including items still
@@ -45,8 +68,10 @@ function estimateTotal(
       return;
     }
     const est = estimates[j];
-    if (!est || est.unitquantity <= 0 || est.unit !== item.unit) return;
-    const factor = item.quantity / est.unitquantity;
+    if (!est || est.unitquantity <= 0) return;
+    const converted = convertToEstimateBasis(item.quantity, item.unit, est);
+    if (converted == null) return;
+    const factor = converted / est.unitquantity;
     calories += est.calories * factor;
     protein += est.protein * factor;
   });
@@ -334,6 +359,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                             <EstimateFoodForm
                               foodName={item.food_name}
                               brand={item.brand}
+                              parsedUnit={item.unit}
                               estimate={estimates[j] ?? null}
                               onEstimateChange={(e) => setItemEstimate(i, j, e)}
                               externalMatch={item.unconfirmed_food}

@@ -18,6 +18,12 @@ type Props = {
   // can never find this food again and silently creates a duplicate row
   // every time the same branded product is logged.
   brand?: string;
+  // The unit the user's original quantity was parsed as (e.g. "count" for
+  // "a slice of sourdough"), independent of what basis the AI's estimate
+  // came back on — used alongside brand (below) to decide whether the
+  // grams-per-unit field is worth showing at all (see that field's render
+  // condition).
+  parsedUnit?: string;
   // Controlled by the parent (LogMealSheet) rather than owned here, so
   // "log this meal" can save whatever's currently in the form — including
   // unsaved edits — for every pending item in one pass, instead of
@@ -58,7 +64,7 @@ function toEstimate(food: Food): NutritionEstimate {
   };
 }
 
-export default function EstimateFoodForm({ foodName, brand, estimate, onEstimateChange, externalMatch, trackedMacros }: Props) {
+export default function EstimateFoodForm({ foodName, brand, parsedUnit, estimate, onEstimateChange, externalMatch, trackedMacros }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const FIELDS = BASE_FIELDS.filter((f) => !f.macro || !trackedMacros || trackedMacros.includes(f.macro));
@@ -128,9 +134,14 @@ export default function EstimateFoodForm({ foodName, brand, estimate, onEstimate
           <Text style={styles.basisUnitText}>{estimate.unit}</Text>
         </View>
       </View>
-      {estimate.unit === 'count' && (
+      {/* Only worth asking for a per-unit gram weight when it's genuinely
+          unknowable from a reliable source — a vague/homemade item with no
+          brand. A branded/chain item (Chick-fil-A, Taco Bell) already has a
+          documented official serving size, so the estimate's unitquantity
+          alone is trustworthy and this field would just be noise. */}
+      {!brand && (estimate.unit === 'count' || parsedUnit === 'count') && (
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>1 {estimate.unit} =</Text>
+          <Text style={styles.fieldLabel}>1 {parsedUnit ?? estimate.unit} =</Text>
           <View style={styles.basisRow}>
             <TextInput
               style={[styles.fieldInput, styles.basisQuantityInput]}
