@@ -73,7 +73,7 @@ export default function MealsBySlot({ meals, trackedMacros }: { meals: MealLog[]
   return (
     <>
       {slotsWithMeals.map((slot, i) => (
-        <View key={slot} style={{ marginTop: i === 0 ? 26 : 0, marginBottom: 18 }}>
+        <View key={slot} style={{ marginTop: i === 0 ? 26 : 6 }}>
           <Text style={styles.kicker}>{SLOT_LABEL[slot]}</Text>
           {(mealsBySlot[slot] ?? []).map((meal) => (
             <MealCard key={meal.id} meal={meal} trackedMacros={trackedMacros} />
