@@ -68,6 +68,11 @@ type ChatEntry =
       // index — lets "log this meal" save whatever's currently in each
       // form without a separate per-item save step.
       estimates: Record<number, NutritionEstimate>;
+      // Item indices the user explicitly dismissed via the estimate card's
+      // cancel button — hidden from the pending list and excluded from
+      // both the displayed total and the save, same as an item that was
+      // never resolved.
+      removed: Set<number>;
     }
   | { role: 'error'; text: string };
 
@@ -117,7 +122,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
       const response = await chatMeal(text);
       setEntries((prev) => [
         ...prev,
-        { role: 'assistant', response, saved: false, saving: false, savedSlot: null, estimates: {} },
+        { role: 'assistant', response, saved: false, saving: false, savedSlot: null, estimates: {}, removed: new Set() },
       ]);
     } catch {
       setEntries((prev) => [...prev, { role: 'error', text: 'Could not reach the server.' }]);
@@ -184,6 +189,21 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
           ? { ...e, estimates: { ...e.estimates, [itemIndex]: estimate } }
           : e
       )
+    );
+  }
+
+  // Dismisses an estimate card entirely — the item is dropped from the
+  // total and skipped when logging, same as an item that never resolved.
+  function removeItem(entryIndex: number, itemIndex: number) {
+    setEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== entryIndex || e.role !== 'assistant') return e;
+        const estimates = { ...e.estimates };
+        delete estimates[itemIndex];
+        const removed = new Set(e.removed);
+        removed.add(itemIndex);
+        return { ...e, estimates, removed };
+      })
     );
   }
 
@@ -271,7 +291,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
             // returned them.
             const indexed = response.result.items.map((item, j) => ({ item, j }));
             const resolved = indexed.filter(({ item }) => !needsReview(item));
-            const pending = indexed.filter(({ item }) => needsReview(item));
+            const pending = indexed.filter(({ item, j }) => needsReview(item) && !entry.removed.has(j));
 
             return (
               <View key={i} style={[styles.bubble, styles.assistantBubble, { maxWidth: '100%' }]}>
@@ -305,7 +325,12 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                       {pending.map(({ item, j }) => (
                         <View key={j} style={styles.itemRow}>
                           <View style={styles.estimateCard}>
-                            <Text style={styles.itemName}>{itemDisplayName(item)}</Text>
+                            <View style={styles.estimateCardHeader}>
+                              <Text style={styles.itemName}>{itemDisplayName(item)}</Text>
+                              <Pressable onPress={() => removeItem(i, j)} hitSlop={8}>
+                                <Feather name="x" size={16} color={colors.text} style={{ opacity: 0.5 }} />
+                              </Pressable>
+                            </View>
                             <EstimateFoodForm
                               foodName={item.food_name}
                               brand={item.brand}
@@ -428,7 +453,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     gap: 6,
   },
-  itemName: { fontFamily: fonts.heading, fontSize: 14, color: colors.text },
+  estimateCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  itemName: { fontFamily: fonts.heading, fontSize: 14, color: colors.text, flex: 1, marginRight: 8 },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0392b' },
   warningText: { fontFamily: fonts.body, fontSize: 12, color: '#d68910' },
   totalText: { fontFamily: fonts.bodyBold, marginTop: 8, fontSize: 13, color: colors.text },

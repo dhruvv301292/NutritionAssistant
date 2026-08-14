@@ -38,4 +38,10 @@ type NutritionEstimate struct {
 	Sodium       float64 `json:"sodium"`
 	Unit         string  `json:"unit"`
 	UnitQuantity float64 `json:"unitquantity"`
+	// GramsPerUnit is only meaningful when Unit is "count" — how many grams
+	// one of that count-based unit weighs (e.g. one slice of sourdough ≈
+	// 50g). The model's guess here is a starting point, not authoritative;
+	// the user reviews and can correct it before it's saved (see
+	// EstimateFoodForm), same trust boundary as the macro values.
+	GramsPerUnit *float64 `json:"grams_per_unit,omitempty"`
 }

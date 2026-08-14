@@ -104,6 +104,11 @@ export type NutritionEstimate = {
   sodium: number;
   unit: string;
   unitquantity: number;
+  // Only meaningful when unit is 'count' — how many grams a single one of
+  // that count-based unit weighs (e.g. one slice of bread). User-editable
+  // so an AI estimate that assumed the wrong serving weight can be
+  // corrected before it's saved to the foods table.
+  grams_per_unit?: number;
 };
 
 export type User = {

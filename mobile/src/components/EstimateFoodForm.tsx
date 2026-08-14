@@ -54,6 +54,7 @@ function toEstimate(food: Food): NutritionEstimate {
     sodium: food.sodium,
     unit: food.unit,
     unitquantity: food.unitquantity,
+    grams_per_unit: food.grams_per_unit,
   };
 }
 
@@ -94,6 +95,12 @@ export default function EstimateFoodForm({ foodName, brand, estimate, onEstimate
     onEstimateChange({ ...estimate, unitquantity: parseFloat(value) || 0 });
   }
 
+  function updateGramsPerUnit(value: string) {
+    if (!estimate) return;
+    const parsed = parseFloat(value);
+    onEstimateChange({ ...estimate, grams_per_unit: Number.isFinite(parsed) ? parsed : undefined });
+  }
+
   if (!estimate) {
     return (
       <View style={styles.container}>
@@ -121,6 +128,21 @@ export default function EstimateFoodForm({ foodName, brand, estimate, onEstimate
           <Text style={styles.basisUnitText}>{estimate.unit}</Text>
         </View>
       </View>
+      {estimate.unit === 'count' && (
+        <View style={styles.fieldRow}>
+          <Text style={styles.fieldLabel}>1 {estimate.unit} =</Text>
+          <View style={styles.basisRow}>
+            <TextInput
+              style={[styles.fieldInput, styles.basisQuantityInput]}
+              keyboardType="numeric"
+              placeholder="?"
+              value={estimate.grams_per_unit != null ? String(estimate.grams_per_unit) : ''}
+              onChangeText={updateGramsPerUnit}
+            />
+            <Text style={styles.basisUnitText}>grams</Text>
+          </View>
+        </View>
+      )}
       {FIELDS.map((f) => (
         <View key={f.key} style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>{f.label}</Text>
