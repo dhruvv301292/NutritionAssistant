@@ -115,18 +115,23 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
     const { response, estimates } = entry;
     setEntrySaving(index, true);
     try {
-      const items: { food_name: string; quantity: number; unit: string }[] = [];
+      const items: { food_name: string; quantity: number; unit: string; brand?: string }[] = [];
       for (let j = 0; j < response.result.items.length; j++) {
         const item = response.result.items[j];
         if (item.matched_food) {
           if (item.ambiguous) continue;
-          items.push({ food_name: item.matched_food.name, quantity: item.quantity, unit: item.unit });
+          items.push({
+            food_name: item.matched_food.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            brand: item.matched_food.brand,
+          });
           continue;
         }
         const pending = estimates[j];
         if (pending) {
           const created = await createFood(pending);
-          items.push({ food_name: created.name, quantity: item.quantity, unit: item.unit });
+          items.push({ food_name: created.name, quantity: item.quantity, unit: item.unit, brand: created.brand });
         }
         // Items with neither a matched_food nor a pending estimate (still
         // ambiguous, or a hard error with no estimate form shown) are
@@ -277,6 +282,7 @@ export default function LogMealSheet({ visible, onClose, onMealSaved, trackedMac
                             <Text style={styles.itemName}>{itemDisplayName(item)}</Text>
                             <EstimateFoodForm
                               foodName={item.food_name}
+                              brand={item.brand}
                               estimate={estimates[j] ?? null}
                               onEstimateChange={(e) => setItemEstimate(i, j, e)}
                               externalMatch={item.unconfirmed_food}

@@ -12,6 +12,12 @@ export function needsEstimate(error: string | undefined): boolean {
 
 type Props = {
   foodName: string;
+  // Threaded through to the estimate request and stamped onto the created
+  // food, so a branded item never gets saved with brand=null — without
+  // this, brand-based matching/dedup (see backend foods/repository.go)
+  // can never find this food again and silently creates a duplicate row
+  // every time the same branded product is logged.
+  brand?: string;
   // Controlled by the parent (LogMealSheet) rather than owned here, so
   // "log this meal" can save whatever's currently in the form — including
   // unsaved edits — for every pending item in one pass, instead of
@@ -39,6 +45,7 @@ const BASE_FIELDS: { key: FieldKey; label: string; macro?: TrackedMacro }[] = [
 function toEstimate(food: Food): NutritionEstimate {
   return {
     name: food.name,
+    brand: food.brand,
     calories: food.calories,
     protein: food.protein,
     carbs: food.carbs,
@@ -50,7 +57,7 @@ function toEstimate(food: Food): NutritionEstimate {
   };
 }
 
-export default function EstimateFoodForm({ foodName, estimate, onEstimateChange, externalMatch, trackedMacros }: Props) {
+export default function EstimateFoodForm({ foodName, brand, estimate, onEstimateChange, externalMatch, trackedMacros }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const FIELDS = BASE_FIELDS.filter((f) => !f.macro || !trackedMacros || trackedMacros.includes(f.macro));
@@ -69,7 +76,7 @@ export default function EstimateFoodForm({ foodName, estimate, onEstimateChange,
     setLoading(true);
     setError(null);
     try {
-      onEstimateChange(await estimateFood(foodName));
+      onEstimateChange(await estimateFood(foodName, brand));
     } catch {
       setError('Could not get an estimate.');
     } finally {

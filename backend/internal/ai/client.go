@@ -92,7 +92,12 @@ func (c *Client) ParseMeal(ctx context.Context, text string) (ParsedMeal, error)
 // surface it as an editable suggestion and never persist or use it in a
 // meal total until a human confirms or corrects it (see CLAUDE.md's Key
 // Architecture Rule).
-func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (NutritionEstimate, error) {
+// brand, if non-empty, is folded into the prompt (so the model knows which
+// specific branded product to search for) and stamped onto the returned
+// estimate directly — not something the model fills into the tool schema
+// itself, since it's already a known, structured value from the caller
+// (the parsed meal item or an existing food match), not something to guess.
+func (c *Client) EstimateNutrition(ctx context.Context, foodName, brand string) (NutritionEstimate, error) {
 	tool := anthropic.ToolUnionParamOfTool(anthropic.ToolInputSchemaParam{
 		Properties: map[string]any{
 			"name":          map[string]any{"type": "string", "description": "cleaned-up food name"},
@@ -132,6 +137,11 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 		MaxUses: anthropic.Int(3),
 	}}
 
+	userText := foodName
+	if brand != "" {
+		userText = brand + " " + foodName
+	}
+
 	// ToolChoice is left at the default (auto) rather than forced onto
 	// estimateNutritionToolName, since forcing it would prevent Claude from
 	// ever calling web_search first — it needs the freedom to search, then
@@ -144,7 +154,7 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 		System:    []anthropic.TextBlockParam{system},
 		Tools:     []anthropic.ToolUnionParam{tool, webSearch},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(foodName)),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userText)),
 		},
 	}
 
@@ -153,7 +163,7 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 		return NutritionEstimate{}, fmt.Errorf("anthropic request failed: %w", err)
 	}
 	if estimate, ok := extractEstimate(message); ok {
-		return estimate, nil
+		return withBrand(estimate, brand), nil
 	}
 
 	// auto tool_choice occasionally lets the model stop after searching
@@ -169,10 +179,17 @@ func (c *Client) EstimateNutrition(ctx context.Context, foodName string) (Nutrit
 		return NutritionEstimate{}, fmt.Errorf("anthropic request failed: %w", err)
 	}
 	if estimate, ok := extractEstimate(message); ok {
-		return estimate, nil
+		return withBrand(estimate, brand), nil
 	}
 
 	return NutritionEstimate{}, errNoToolUse
+}
+
+func withBrand(estimate NutritionEstimate, brand string) NutritionEstimate {
+	if brand != "" {
+		estimate.Brand = &brand
+	}
+	return estimate
 }
 
 // VerifyBrandMatch asks the model whether a candidate database row is the

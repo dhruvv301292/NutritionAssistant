@@ -94,6 +94,7 @@ export type Goals = {
 
 export type NutritionEstimate = {
   name: string;
+  brand?: string;
   calories: number;
   protein: number;
   carbs: number;

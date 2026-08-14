@@ -54,7 +54,7 @@ export function chatMeal(text: string): Promise<ChatMealResponse> {
 }
 
 export function saveMeal(
-  items: { food_name: string; quantity: number; unit: string }[],
+  items: { food_name: string; quantity: number; unit: string; brand?: string }[],
   slot: Slot
 ): Promise<MealLog> {
   return request('/meals', {
@@ -79,8 +79,8 @@ export function putGoals(goals: Goals): Promise<Goals> {
   return request('/goals', { method: 'PUT', body: JSON.stringify(goals) });
 }
 
-export function estimateFood(name: string): Promise<NutritionEstimate> {
-  return request('/foods/estimate', { method: 'POST', body: JSON.stringify({ name }) });
+export function estimateFood(name: string, brand?: string): Promise<NutritionEstimate> {
+  return request('/foods/estimate', { method: 'POST', body: JSON.stringify({ name, brand }) });
 }
 
 export function createFood(estimate: NutritionEstimate): Promise<Food> {

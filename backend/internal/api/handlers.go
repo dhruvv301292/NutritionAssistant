@@ -332,7 +332,8 @@ func (h *Handler) ParseMeal(w http.ResponseWriter, r *http.Request) {
 }
 
 type EstimateFoodRequest struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
+	Brand string `json:"brand,omitempty"`
 }
 
 // EstimateFood is the fallback when a food isn't in our own database (see
@@ -351,7 +352,7 @@ func (h *Handler) EstimateFood(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name must not be empty", http.StatusBadRequest)
 		return
 	}
-	estimate, err := h.aiClient.EstimateNutrition(r.Context(), req.Name)
+	estimate, err := h.aiClient.EstimateNutrition(r.Context(), req.Name, req.Brand)
 	if err != nil {
 		http.Error(w, "failed to estimate nutrition", http.StatusBadGateway)
 		return

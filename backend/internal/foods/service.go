@@ -60,6 +60,19 @@ func (s *Service) GetByID(ctx context.Context, id int) (nutrition.Food, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+// createDuplicateThreshold is how similar a new branded food's "brand name"
+// must be to an existing row before Create treats it as the same product
+// rather than inserting a new one. Deliberately much stricter than
+// brandHardThreshold (matcher.go's threshold for MATCHING a query to an
+// existing food) — Insert's ON CONFLICT (brand, name) only catches EXACT
+// name matches, but the LLM estimator's name field is free text and its
+// phrasing isn't stable across calls (e.g. "Diet Coke (Coca-Cola Diet)" vs
+// "Diet Coca-Cola" for the same product), so exact-match dedup silently let
+// duplicate rows pile up. 0.75 is high enough that genuinely different
+// products from the same brand (e.g. "Quest Protein Bar" vs "Quest Protein
+// Shake") won't collide.
+const createDuplicateThreshold = 0.75
+
 // Create persists a user-confirmed food — the shared endpoint for both the
 // LLM-estimate flow and the external-database-match flow. Nothing from
 // outside this service (an external API, an LLM guess) reaches the foods
@@ -67,7 +80,21 @@ func (s *Service) GetByID(ctx context.Context, id int) (nutrition.Food, error) {
 // themselves to be unreliable (see CLAUDE.md's Food Lookup Flow and the
 // "chicken wings" incident — USDA's top-ranked result for a plain search
 // can be an outlier branded product's numbers).
+//
+// For branded foods, this first checks for an existing near-identical row
+// (see createDuplicateThreshold) and reuses it instead of inserting, since
+// Insert's exact-name ON CONFLICT can't catch near-duplicates from
+// non-deterministic LLM naming.
 func (s *Service) Create(ctx context.Context, f nutrition.Food) (nutrition.Food, error) {
+	if f.Brand != nil && *f.Brand != "" {
+		candidates, err := s.repo.SearchBranded(ctx, *f.Brand, f.Name)
+		if err != nil {
+			return nutrition.Food{}, err
+		}
+		if len(candidates) > 0 && candidates[0].Similarity >= createDuplicateThreshold {
+			return candidates[0].Food, nil
+		}
+	}
 	return s.repo.Insert(ctx, f)
 }
 

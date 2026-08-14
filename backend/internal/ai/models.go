@@ -22,7 +22,14 @@ type ParsedMeal struct {
 // a calculation result — the client must show it as a draft the user can
 // correct before it's saved to the foods table.
 type NutritionEstimate struct {
-	Name         string  `json:"name"`
+	Name string `json:"name"`
+	// Brand is carried through from the caller rather than guessed by the
+	// model (see EstimateNutrition) — it's not part of the tool schema the
+	// model fills in, only stamped onto the result afterward, so a later
+	// Create can persist it and future lookups for the same branded product
+	// match by brand instead of silently creating a near-duplicate row with
+	// brand=NULL (see foods/repository.go's brand-based matching).
+	Brand        *string `json:"brand,omitempty"`
 	Calories     float64 `json:"calories"`
 	Protein      float64 `json:"protein"`
 	Carbs        float64 `json:"carbs"`

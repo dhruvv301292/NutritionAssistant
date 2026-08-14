@@ -31,7 +31,11 @@ import (
 type aiEstimatorProvider struct{ client *ai.Client }
 
 func (p aiEstimatorProvider) Lookup(ctx context.Context, query string) (*foods.ExternalResult, error) {
-	estimate, err := p.client.EstimateNutrition(ctx, query)
+	// brand is already folded into query by the time it reaches here (see
+	// Matcher.resolveBrandedItem's brand+" "+productName), so nothing extra
+	// to pass — this adapter's caller doesn't have a separate structured
+	// brand value at this point.
+	estimate, err := p.client.EstimateNutrition(ctx, query, "")
 	if err != nil {
 		return nil, err
 	}
